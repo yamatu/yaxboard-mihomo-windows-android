@@ -36,8 +36,10 @@ class AppController {
   }
 
   updateClashConfigDebounce() {
+    // 这里直接调用内部的 _updateClashConfig, 避免依赖 homeScaffoldKey 的 UI 状态,
+    // 保证托盘、快捷键、XBoard 小组件等任意入口都可以热更新核心配置
     debouncer.call(FunctionTag.updateClashConfig, () async {
-      await updateClashConfig();
+      await _updateClashConfig();
     });
   }
 
@@ -85,23 +87,64 @@ class AppController {
 
   updateStatus(bool isStart) async {
     if (isStart) {
+      // 桌面端兜底：用户只点击“启动代理”但未开启系统代理开关时，
+      // 会导致系统代理不会自动设置（需要手动去系统设置开启）。
+      // 这里在启动时自动打开开关，确保可用性；用户仍可在设置中手动关闭。
+      if (system.isDesktop) {
+        final enabled =
+            _ref.read(networkSettingProvider.select((s) => s.systemProxy));
+        if (!enabled) {
+          _ref.read(networkSettingProvider.notifier).updateState(
+                (state) => state.copyWith(systemProxy: true),
+              );
+          // 尽量同步 vpnProps，避免配置里出现两个开关值不一致。
+          _ref.read(vpnSettingProvider.notifier).updateState(
+                (state) => state.copyWith(systemProxy: true),
+              );
+          commonPrint.log("[Proxy] 启动代理时自动开启系统代理开关");
+        }
+      }
+
+      // Android/部分设备：在配置未就绪（节点未加载/配置未下发）时先启动 listener
+      // 可能导致底层崩溃。这里调整为：先下发配置，再启动核心。
+      final profile = _ref.read(currentProfileProvider);
+      if (profile == null) {
+        globalState.showNotifier("未选择配置，无法启动代理");
+        return;
+      }
+
+      try {
+        // 若本地尚无配置文件会触发拉取；若配置不可用会抛错。
+        await profile.checkAndUpdate();
+        await _applyProfile();
+      } catch (e) {
+        commonPrint.log("[Core] 启动前下发配置失败：$e");
+        globalState.showNotifier("启动失败：配置未就绪，请先更新订阅/稍后重试\n$e");
+        return;
+      }
+
       await globalState.handleStart([
         updateRunTime,
         updateTraffic,
       ]);
-      final currentLastModified =
-          await _ref.read(currentProfileProvider)?.profileLastModified;
-      if (currentLastModified == null || lastProfileModified == null) {
-        addCheckIpNumDebounce();
-        return;
-      }
-      if (currentLastModified <= (lastProfileModified ?? 0)) {
-        addCheckIpNumDebounce();
-        return;
-      }
-      applyProfileDebounce();
     } else {
       await globalState.handleStop();
+
+      // Desktop (especially Windows): stopping core should also restore system proxy.
+      // Some environments (e.g. TUN on/off switches, rapid toggles) may miss the
+      // ProxyManager listener; do a best-effort fallback here.
+      if (system.isDesktop) {
+        final systemProxyEnabled =
+            _ref.read(networkSettingProvider.select((s) => s.systemProxy));
+        if (systemProxyEnabled) {
+          try {
+            await proxy?.stopProxy();
+          } catch (_) {
+            // ignore
+          }
+        }
+      }
+
       await clashCore.resetTraffic();
       _ref.read(trafficsProvider.notifier).clear();
       _ref.read(totalTrafficProvider.notifier).value = Traffic();
@@ -258,11 +301,26 @@ class AppController {
 
   Future<void> _updateClashConfig() async {
     final updateParams = _ref.read(updateParamsProvider);
-    final res = await _requestAdmin(updateParams.tun.enable);
+    final enableTun = updateParams.tun.enable;
+    // 记录当前实际的 TUN 启用状态, 用于判断是否是“首次开启 TUN”
+    final prevRealTunEnable = _ref.read(realTunEnableProvider);
+    // 先根据当前的 TUN 开关请求/确认管理员权限, 并在内部同步 realTunEnable 状态
+    final res = await _requestAdmin(enableTun);
     if (res.isError) {
+      // 授权失败时不再继续下发配置, 避免进入半开启状态
       return;
     }
     final realTunEnable = _ref.read(realTunEnableProvider);
+    // 如果是“首次从未开启 -> 开启 TUN”, _requestAdmin 内部已经执行了 restartCore + 完整的
+    // 配置下发(_initCore/_applyProfile/_setupClashConfig)。此时立刻再调用一次 updateConfig
+    // 往往发生在核心刚重启、控制通道还未稳定的时刻, 容易触发 Windows 下的 10054 连接异常,
+    // 导致首次开启 TUN 时卡死或退出异常。这里直接跳过本轮增量更新, 交给刚刚执行的完整
+    // setupConfig 负责应用最新配置, 可以显著减小首启 TUN 的不稳定行为。
+    final isFirstEnableTun =
+        enableTun && prevRealTunEnable != true && res.isSuccess;
+    if (isFirstEnableTun) {
+      return;
+    }
     final message = await clashCore.updateConfig(
       updateParams.copyWith.tun(
         enable: realTunEnable,
@@ -271,23 +329,81 @@ class AppController {
     if (message.isNotEmpty) throw message;
   }
 
+  /// 处理桌面端 TUN 模式所需的管理员权限/Helper 服务。
+  ///
+  /// - [enableTun] 为 true 表示希望开启 TUN；false 表示关闭 TUN。
+  /// - 内部统一维护 [realTunEnableProvider]，避免出现“配置里是打开的但内核实际没开”的半开启状态。
+  /// - Windows/macOS/Linux 首次开启 TUN 时会弹出提权/注册 Helper 的流程，并在成功后重启核心。
   Future<Result<bool>> _requestAdmin(bool enableTun) async {
-    final realTunEnable = _ref.read(realTunEnableProvider);
-    if (enableTun != realTunEnable && realTunEnable == false) {
-      final code = await system.authorizeCore();
-      switch (code) {
-        case AuthorizeCode.success:
-          await restartCore();
-          return Result.error("");
-        case AuthorizeCode.none:
-          break;
-        case AuthorizeCode.error:
-          enableTun = false;
-          break;
-      }
+    // 如果不需要开启 TUN, 直接同步状态并返回
+    if (!enableTun) {
+      _ref.read(realTunEnableProvider.notifier).value = false;
+      return Result.success(false);
     }
-    _ref.read(realTunEnableProvider.notifier).value = enableTun;
-    return Result.success(enableTun);
+
+    // 需要开启 TUN
+    var realTunEnable = _ref.read(realTunEnableProvider);
+
+    // 已经是开启状态, 直接返回
+    if (realTunEnable == true) {
+      return Result.success(true);
+    }
+
+    // 如果系统层面已经具备管理员权限/Helper 服务在运行, 直接标记为已启用
+    if (await system.checkIsAdmin()) {
+      _ref.read(realTunEnableProvider.notifier).value = true;
+      return Result.success(true);
+    }
+
+    // 尝试申请管理员权限/注册 Helper
+    final code = await system.authorizeCore();
+    switch (code) {
+      case AuthorizeCode.success:
+        // 提权成功, 标记并重启核心, 让 TUN 能够生效
+      _ref.read(realTunEnableProvider.notifier).value = true;
+      await restartCore();
+      return Result.success(true);
+      case AuthorizeCode.none:
+        // 用户取消授权, 回退为未开启 TUN
+      _ref.read(realTunEnableProvider.notifier).value = false;
+      return Result.success(false);
+      case AuthorizeCode.error:
+        // 授权失败, 标记为未开启并返回错误, 上层不再继续调用 updateConfig/setupConfig
+      _ref.read(realTunEnableProvider.notifier).value = false;
+      return Result.error("authorize failed");
+    }
+  }
+
+  /// 根据当前 Profile 中保存的 selectedMap 重新恢复各个分组的手动选中节点
+  /// 这样在重新应用订阅 / 重启应用后, 仍然可以保持用户之前手动选择的节点
+  Future<void> _restoreSelectedProxies() async {
+    try {
+      final selectedMap = _ref.read(selectedMapProvider);
+      if (selectedMap.isEmpty) {
+        return;
+      }
+      for (final entry in selectedMap.entries) {
+        final groupName = entry.key;
+        final proxyName = entry.value;
+        if (groupName.isEmpty || proxyName.isEmpty) {
+          continue;
+        }
+        try {
+          await clashCore.changeProxy(
+            ChangeProxyParams(
+              groupName: groupName,
+              proxyName: proxyName,
+            ),
+          );
+        } catch (e) {
+          commonPrint.log(
+            "restore proxy failed: $groupName -> $proxyName, $e",
+          );
+        }
+      }
+    } catch (e) {
+      commonPrint.log("restore selected proxies error: $e");
+    }
   }
 
   Future<void> setupClashConfig() async {
@@ -303,7 +419,7 @@ class AppController {
     final patchConfig = _ref.read(patchClashConfigProvider);
     final res = await _requestAdmin(patchConfig.tun.enable);
     if (res.isError) {
-      return;
+      throw res.message.isNotEmpty ? res.message : "授权失败，无法应用配置";
     }
     final realTunEnable = _ref.read(realTunEnableProvider);
     final realPatchConfig = patchConfig.copyWith.tun(enable: realTunEnable);
@@ -324,6 +440,9 @@ class AppController {
   Future _applyProfile() async {
     await clashCore.requestGc();
     await _setupClashConfig();
+    // 重新应用配置后优先根据 selectedMap 恢复用户手动选择的节点,
+    // 避免订阅更新或应用重启后又回到自动选择节点
+    await _restoreSelectedProxies();
     await updateGroups();
     await updateProviders();
   }
@@ -439,15 +558,31 @@ class AppController {
   }
 
   handleExit() async {
-    Future.delayed(commonDuration, () {
-      system.exit();
-    });
     try {
       await savePreferences();
       await system.setMacOSDns(true);
-      await proxy?.stopProxy();
+
+      // Ensure VPN/listener stopped on exit.
+      try {
+        await globalState.handleStop();
+      } catch (_) {
+        // ignore
+      }
+
+      // 用户期望：桌面端退出/关机时尽量恢复系统代理，避免残留。
+      // Windows 上 StopProxy 会尽量恢复“启动前快照”。
+      if (system.isDesktop) {
+        try {
+          await proxy?.stopProxy();
+        } catch (_) {
+          // ignore
+        }
+      }
+
       await clashCore.shutdown();
       await clashService?.destroy();
+      // 退出前主动销毁托盘图标, 尽量避免 Windows 残留“幽灵图标”
+      await tray.destroy();
     } finally {
       system.exit();
     }
@@ -540,7 +675,15 @@ class AppController {
         globalState.getCoreState(),
       );
     }
-    await applyProfile();
+
+    // 启动初始化阶段 UI 可能尚未挂载（homeScaffoldKey 为空），
+    // 不能依赖 loadingRun，否则会导致配置未下发、节点未加载。
+    // 这里直接走无 UI 依赖的内部流程，失败则记录日志并允许应用继续启动。
+    try {
+      await _applyProfile();
+    } catch (e) {
+      commonPrint.log("[Core] 初始化应用配置失败（已忽略，待用户手动重试）：$e");
+    }
   }
 
   init() async {
@@ -553,7 +696,8 @@ class AppController {
     autoLaunch?.updateStatus(
       _ref.read(appSettingProvider).autoLaunch,
     );
-    autoUpdateProfiles();
+    // 启动时不再自动更新所有订阅, 仅在用户在订阅页面手动点击同步按钮时更新
+    // autoUpdateProfiles();
     autoCheckUpdate();
     if (!_ref.read(appSettingProvider).silentLaunch) {
       window?.show();
@@ -818,6 +962,15 @@ class AppController {
     _ref.read(patchClashConfigProvider.notifier).updateState(
           (state) => state.copyWith.tun(enable: !state.tun.enable),
         );
+    // 未启动代理时, 只更新配置但不立刻下发到核心。
+    // 这样用户在“未启动代理”的状态下切换 TUN 不会触发核心重启
+    // 或重新应用配置, 避免出现临时性“无可用节点”/网络异常。
+    // 等用户真正点击“启动代理”时, 会通过 updateStatus 中的
+    // applyProfileDebounce 统一按照当前配置重新下发到核心。
+    if (globalState.isStart) {
+      // 仅在代理已运行时才进行实时 TUN 热切换
+      updateClashConfigDebounce();
+    }
   }
 
   updateSystemProxy() {
@@ -878,6 +1031,13 @@ class AppController {
       updateCurrentGroupName(GroupName.GLOBAL.name);
     }
     addCheckIpNumDebounce();
+    // 如果开启了“切换时关闭连接”, 模式切换后主动断开现有连接,
+    // 避免旧连接继续沿用之前的路由策略导致用户感觉模式没有生效
+    if (_ref.read(appSettingProvider).closeConnections) {
+      clashCore.closeConnections();
+    }
+    // 切换模式后, 立即把新的模式参数同步到核心, 实现真正的“热切换”
+    updateClashConfigDebounce();
   }
 
   updateAutoLaunch() {

@@ -136,8 +136,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "autoCloseConnectionsDesc": MessageLookupByLibrary.simpleMessage(
       "切换节点后自动关闭连接",
     ),
-    "autoLaunch": MessageLookupByLibrary.simpleMessage("自启动"),
-    "autoLaunchDesc": MessageLookupByLibrary.simpleMessage("跟随系统自启动"),
+    "autoLaunch": MessageLookupByLibrary.simpleMessage("开机自启动"),
+    "autoLaunchDesc": MessageLookupByLibrary.simpleMessage("跟随系统开机自启动"),
     "autoRun": MessageLookupByLibrary.simpleMessage("自动运行"),
     "autoRunDesc": MessageLookupByLibrary.simpleMessage("应用打开时自动运行"),
     "autoSetSystemDns": MessageLookupByLibrary.simpleMessage("自动设置系统DNS"),

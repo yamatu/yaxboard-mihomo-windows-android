@@ -5,6 +5,8 @@ import 'package:fl_clash/xboard/features/profile/providers/profile_import_provid
 import 'package:fl_clash/xboard/core/core.dart';
 import 'package:fl_clash/xboard/domain/domain.dart';
 import 'package:fl_clash/xboard/infrastructure/providers/repository_providers.dart';
+import 'package:fl_clash/providers/providers.dart';
+import 'package:fl_clash/state.dart';
 
 // 初始化文件级日志器
 final _logger = FileLogger('xboard_user_provider.dart');
@@ -15,6 +17,24 @@ final subscriptionInfoProvider = StateProvider<DomainSubscription?>((ref) => nul
 final userUIStateProvider = StateProvider<UIState>((ref) => const UIState());
 class XBoardUserAuthNotifier extends Notifier<UserAuthState> {
   late final XBoardStorageService _storageService;
+
+  Future<void> _disconnectProxyBeforeSubscriptionRefresh(String tag) async {
+    try {
+      // Only matters when core is running.
+      final isStart = ref.read(runTimeProvider) != null;
+      if (!isStart) return;
+
+      if (!globalState.isInit) return;
+
+      _logger.warning('[$tag] 核心正在运行，刷新订阅前先断开代理/TUN，避免崩溃');
+      await globalState.appController.updateStatus(false);
+
+      // Give proxy plugin/VPN service a moment to settle.
+      await Future.delayed(const Duration(milliseconds: 400));
+    } catch (e, st) {
+      _logger.error('[$tag] 刷新订阅前断开代理失败（忽略继续）', e, st);
+    }
+  }
   
   @override
   UserAuthState build() {
@@ -68,9 +88,11 @@ class XBoardUserAuthNotifier extends Notifier<UserAuthState> {
         _backgroundTokenValidation();
         
         // 启动时自动导入订阅
-        if (subscriptionInfo?.subscribeUrl?.isNotEmpty == true) {
+        if (subscriptionInfo?.subscribeUrl.isNotEmpty == true) {
           _logger.info('启动时自动导入订阅: ${subscriptionInfo!.subscribeUrl}');
-          ref.read(profileImportProvider.notifier).importSubscription(subscriptionInfo.subscribeUrl!);
+          ref
+              .read(profileImportProvider.notifier)
+              .importSubscription(subscriptionInfo.subscribeUrl);
         }
         
         return true;
@@ -345,6 +367,9 @@ class XBoardUserAuthNotifier extends Notifier<UserAuthState> {
     if (!state.isAuthenticated) {
       return;
     }
+
+    await _disconnectProxyBeforeSubscriptionRefresh('支付后刷新订阅');
+
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       _logger.info('刷新订阅信息...');
@@ -403,6 +428,9 @@ class XBoardUserAuthNotifier extends Notifier<UserAuthState> {
     if (!state.isAuthenticated) {
       return;
     }
+
+    await _disconnectProxyBeforeSubscriptionRefresh('手动刷新订阅');
+
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       _logger.info('刷新订阅信息...');

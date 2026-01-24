@@ -180,6 +180,12 @@ class _XBoardHomePageState extends ConsumerState<XBoardHomePage>
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           const NoticeBanner(),
+                          if (Platform.isWindows)
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                              child: _buildWindowsAutoLaunchTile(),
+                            ),
+                          if (Platform.isWindows) SizedBox(height: sectionSpacing),
                           Padding(
                             padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
                             child: _buildUsageSection(),
@@ -234,6 +240,30 @@ class _XBoardHomePageState extends ConsumerState<XBoardHomePage>
   }
   Widget _buildProxyModeSection() {
     return const XBoardOutboundMode();
+  }
+
+  Widget _buildWindowsAutoLaunchTile() {
+    return Consumer(
+      builder: (context, ref, child) {
+        final enabled = ref.watch(appSettingProvider.select((s) => s.autoLaunch));
+        return Card(
+          elevation: 0,
+          child: ListTile(
+            leading: const Icon(Icons.power_settings_new),
+            title: Text(appLocalizations.autoLaunch),
+            subtitle: Text(appLocalizations.autoLaunchDesc),
+            trailing: Switch(
+              value: enabled,
+              onChanged: (value) {
+                ref.read(appSettingProvider.notifier).updateState(
+                      (state) => state.copyWith(autoLaunch: value),
+                    );
+              },
+            ),
+          ),
+        );
+      },
+    );
   }
   /// 等待订阅导入完成后再检查订阅状态（备用方案）
   /// 如果3秒后还没有触发导入完成监听器，则主动检查
@@ -304,6 +334,7 @@ class _XBoardHomePageState extends ConsumerState<XBoardHomePage>
           });
         }
       } catch (e) {
+        commonPrint.log('[XBoardHomePage] waitForGroups check failed: $e');
       }
     });
   }

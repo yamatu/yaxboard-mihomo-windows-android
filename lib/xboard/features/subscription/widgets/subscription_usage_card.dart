@@ -263,6 +263,7 @@ class SubscriptionUsageCard extends ConsumerWidget {
       var plans = ref.read(xboardSubscriptionProvider);
       if (plans.isEmpty) {
         await ref.read(xboardSubscriptionProvider.notifier).loadPlans();
+        if (!context.mounted) return;
         plans = ref.read(xboardSubscriptionProvider);
       }
       
@@ -502,7 +503,7 @@ class SubscriptionUsageCard extends ConsumerWidget {
     if (profileSubscriptionInfo != null && profileSubscriptionInfo!.total > 0) {
       return profileSubscriptionInfo!.total.toDouble();
     }
-    return userInfo?.transferLimit?.toDouble() ?? 0;
+    return userInfo?.transferLimit.toDouble() ?? 0;
   }
   Color _getProgressColor(double progress, ThemeData theme) {
     if (progress >= 0.9) {

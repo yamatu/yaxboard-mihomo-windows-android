@@ -1,6 +1,8 @@
 import 'package:fl_clash/xboard/core/core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:fl_clash/xboard/utils/app_recovery_service.dart';
+
 import '../models/domain_status_state.dart';
 import '../services/domain_status_service.dart';
 
@@ -93,6 +95,15 @@ class DomainStatusNotifier extends StateNotifier<DomainStatusState> {
           lastChecked: DateTime.now(),
         );
         _logger.error('域名检查失败: ${state.errorMessage}');
+
+        // Windows: 当“拿不到域名/SDK 初始化失败”时，通常是 DNS 缓存/网络环境导致。
+        // 这里提供自动重启兜底（仅一次），避免用户不得不重启电脑。
+        final shouldAutoRestart = result['shouldAutoRestart'] == true;
+        if (shouldAutoRestart) {
+          await AppRecoveryService.maybeAutoRestart(
+            reason: state.errorMessage ?? 'domain_failed',
+          );
+        }
       }
     } catch (e) {
       if (!mounted) return;

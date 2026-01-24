@@ -1,6 +1,7 @@
 import 'package:fl_clash/xboard/core/core.dart';
 import 'package:fl_clash/xboard/config/xboard_config.dart';
 import 'package:fl_clash/xboard/sdk/xboard_sdk.dart';
+import 'package:fl_clash/xboard/utils/app_recovery_service.dart';
 
 // 初始化文件级日志器
 final _logger = FileLogger('domain_status_service.dart');
@@ -46,15 +47,55 @@ class DomainStatusService {
 
       // 使用竞速方式获取最优域名信息
       final startTime = DateTime.now();
-      final bestDomain = await XBoardConfig.getFastestPanelUrl();
+      String? bestDomain = await XBoardConfig.getFastestPanelUrl();
       final availableDomains = XBoardConfig.allPanelUrls;
       final endTime = DateTime.now();
       final latency = endTime.difference(startTime).inMilliseconds;
 
-      if (bestDomain != null && bestDomain.isNotEmpty) {
+      // Windows 特殊处理：DNS 缓存可能导致域名仍解析到旧 IP，竞速会全部失败。
+      // 这里做一次“刷新 DNS + 重新竞速”的兜底重试。
+      if ((bestDomain == null || bestDomain.isEmpty) && AppRecoveryService.isSupported) {
+        _logger.warning('未找到可用域名，尝试刷新DNS缓存并重试');
+        await AppRecoveryService.flushDnsCache();
+        try {
+          await XBoardConfig.refresh();
+        } catch (_) {}
+        bestDomain = await XBoardConfig.getFastestPanelUrl();
+      }
 
-        // 初始化XBoard服务
-        await _initializeXBoardService(bestDomain);
+      if (bestDomain != null && bestDomain.isNotEmpty) {
+        // 初始化XBoard服务（必须成功，否则登录时会出现“SDK 未初始化”）
+        final initOk = await _initializeXBoardService(bestDomain);
+        if (!initOk) {
+          // 再做一次 DNS 刷新 + 重试初始化
+          if (AppRecoveryService.isSupported) {
+            _logger.warning('XBoard SDK 初始化失败，尝试刷新DNS缓存并重试初始化');
+            await AppRecoveryService.flushDnsCache();
+            try {
+              await XBoardConfig.refresh();
+            } catch (_) {}
+            final retryOk = await _initializeXBoardService(bestDomain);
+            if (!retryOk) {
+              return {
+                'success': false,
+                'domain': null,
+                'latency': latency,
+                'availableDomains': availableDomains,
+                'message': 'SDK initialization failed',
+                'shouldAutoRestart': true,
+              };
+            }
+          } else {
+            return {
+              'success': false,
+              'domain': null,
+              'latency': latency,
+              'availableDomains': availableDomains,
+              'message': 'SDK initialization failed',
+              'shouldAutoRestart': false,
+            };
+          }
+        }
 
         _logger.info('域名检查成功: $bestDomain (${latency}ms)');
         
@@ -73,6 +114,7 @@ class DomainStatusService {
           'latency': latency,
           'availableDomains': <String>[],
           'message': '无法获取可用域名',
+          'shouldAutoRestart': AppRecoveryService.isSupported,
         };
       }
     } catch (e) {
@@ -83,6 +125,7 @@ class DomainStatusService {
         'latency': null,
         'availableDomains': <String>[],
         'message': '域名检查失败: $e',
+        'shouldAutoRestart': false,
       };
     }
   }
@@ -126,7 +169,7 @@ class DomainStatusService {
   }
 
   /// 初始化XBoard服务
-  Future<void> _initializeXBoardService(String domain) async {
+  Future<bool> _initializeXBoardService(String domain) async {
     try {
       _logger.info('初始化XBoard服务: $domain');
       // 使用当前域名重新初始化XBoard服务
@@ -136,9 +179,10 @@ class DomainStatusService {
       );
       
       _logger.info('XBoard服务初始化成功');
+      return true;
     } catch (e) {
       _logger.error('XBoard服务初始化失败', e);
-      // 不抛出异常，因为域名检查已经成功
+      return false;
     }
   }
 

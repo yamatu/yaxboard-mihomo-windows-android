@@ -1,4 +1,6 @@
 
+import 'dart:io';
+
 import 'package:fl_clash/xboard/services/services.dart';
 import 'package:fl_clash/xboard/features/auth/providers/xboard_user_provider.dart';
 import 'package:fl_clash/xboard/features/domain_status/domain_status.dart';
@@ -11,6 +13,8 @@ import 'forgot_password_page.dart';
 import 'package:fl_clash/xboard/features/shared/shared.dart';
 import 'package:fl_clash/xboard/config/utils/config_file_loader.dart';
 import 'package:fl_clash/xboard/utils/xboard_notification.dart';
+import 'package:fl_clash/xboard/sdk/xboard_sdk.dart';
+import 'package:fl_clash/xboard/utils/app_recovery_service.dart';
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
   @override
@@ -22,6 +26,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final _passwordController = TextEditingController();
   bool _rememberPassword = false;
   bool _isPasswordVisible = false;
+  bool _isRepairing = false;
   late XBoardStorageService _storageService;
   
   // 从配置文件加载的应用信息
@@ -58,6 +63,67 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(domainStatusProvider.notifier).checkDomain();
     });
+  }
+
+  Future<void> _flushDnsAndRetry() async {
+    if (!Platform.isWindows || _isRepairing) return;
+    setState(() {
+      _isRepairing = true;
+    });
+    try {
+      await AppRecoveryService.flushDnsCache();
+      // Force a clean re-init path.
+      XBoardSDK.dispose();
+      await ref.read(domainStatusProvider.notifier).refresh();
+      XBoardNotification.showSuccess('网络已刷新');
+    } catch (e) {
+      XBoardNotification.showError('网络刷新失败：$e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRepairing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _showRepairDialog() async {
+    if (!Platform.isWindows || _isRepairing) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('网络修复'),
+          content: const Text(
+            '如果域名解析卡住（本地DNS缓存仍是旧IP），你可以刷新DNS并重试，或者彻底重启软件。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(appLocalizations.cancel),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await _flushDnsAndRetry();
+              },
+              child: const Text('刷新DNS并重试'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                AppRecoveryService.restartApp(
+                  reason: 'login_page_repair',
+                  flushDnsBeforeRestart: true,
+                  resetSystemProxy: true,
+                );
+              },
+              child: const Text('重启软件'),
+            ),
+          ],
+        );
+      },
+    );
   }
   void refreshCredentials() {
     _loadSavedCredentials();
@@ -147,6 +213,18 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           actions: [
+            if (Platform.isWindows)
+              IconButton(
+                tooltip: '网络修复/重启',
+                onPressed: _isRepairing ? null : _showRepairDialog,
+                icon: _isRepairing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.restart_alt),
+              ),
             const LanguageSelector(),
             const SizedBox(width: 8),
             Padding(

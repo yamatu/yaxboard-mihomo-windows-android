@@ -145,6 +145,11 @@ xboard:
 - [常见问题解答](./faq.md)
 - [故障排查指南](./troubleshooting.md)
 
+## 🤖 维护者 / AI 文档
+
+- [AI Docs 索引](./ai/README.md)
+- [变更记录（每次修改必写）](./changes/README.md)
+
 ## 🆘 获取帮助
 
 如果遇到问题：
