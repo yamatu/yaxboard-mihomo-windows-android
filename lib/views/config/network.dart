@@ -88,14 +88,34 @@ class VpnSystemProxyItem extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, ref) {
-    final systemProxy =
-        ref.watch(vpnSettingProvider.select((state) => state.systemProxy));
+    // 统一“系统代理”开关的语义：
+    // - 桌面端：由 networkSettingProvider.systemProxy 控制（对应系统代理插件）
+    // - Android：由 vpnSettingProvider.systemProxy 控制（对应 VPN 相关逻辑）
+    final systemProxy = system.isDesktop
+        ? ref.watch(networkSettingProvider.select((state) => state.systemProxy))
+        : ref.watch(vpnSettingProvider.select((state) => state.systemProxy));
     return ListItem.switchItem(
       title: Text(appLocalizations.systemProxy),
       subtitle: Text(appLocalizations.systemProxyDesc),
       delegate: SwitchDelegate(
         value: systemProxy,
         onChanged: (bool value) async {
+          if (system.isDesktop) {
+            // 桌面端只需要控制 networkProps.systemProxy，即可触发 ProxyManager 调用 StartProxy。
+            ref.read(networkSettingProvider.notifier).updateState(
+                  (state) => state.copyWith(
+                    systemProxy: value,
+                  ),
+                );
+            // 同步写一份到 vpnProps，避免配置文件里出现“两个开关值不一致”导致用户困惑。
+            ref.read(vpnSettingProvider.notifier).updateState(
+                  (state) => state.copyWith(
+                    systemProxy: value,
+                  ),
+                );
+            return;
+          }
+
           ref.read(vpnSettingProvider.notifier).updateState(
                 (state) => state.copyWith(
                   systemProxy: value,

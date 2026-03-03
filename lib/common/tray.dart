@@ -14,6 +14,18 @@ import 'constant.dart';
 import 'window.dart';
 
 class Tray {
+  /// 主动销毁系统托盘图标, 用于应用退出前的清理, 避免 Windows 残留“幽灵图标”
+  Future<void> destroy() async {
+    if (Platform.isAndroid) {
+      return;
+    }
+    try {
+      await trayManager.destroy();
+    } catch (_) {
+      // 忽略托盘销毁异常, 以免影响应用正常退出
+    }
+  }
+
   Future _updateSystemTray({
     required Brightness? brightness,
     bool force = false,

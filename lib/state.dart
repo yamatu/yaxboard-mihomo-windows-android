@@ -21,6 +21,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'common/common.dart';
 import 'controller.dart';
 import 'models/models.dart';
+import 'package:fl_clash/xboard/config/utils/config_file_loader.dart';
+import 'package:fl_clash/xboard/infrastructure/network/direct_domain_matcher.dart';
 
 typedef UpdateTasks = List<FutureOr Function()>;
 
@@ -94,10 +96,77 @@ class GlobalState {
           themeProps: defaultThemeProps,
         );
     await globalState.migrateOldData(config);
+    await _mergeForceDirectDomainsIntoBypassList();
     await AppLocalizations.load(
       utils.getLocaleForString(config.appSetting.locale) ??
           WidgetsBinding.instance.platformDispatcher.locale,
     );
+  }
+
+  Future<void> _mergeForceDirectDomainsIntoBypassList() async {
+    try {
+      final forceDirectDomains =
+          await ConfigFileLoaderHelper.getForceDirectDomains();
+      if (forceDirectDomains.isEmpty) {
+        return;
+      }
+
+      final currentBypass = config.networkProps.bypassDomain;
+      final mergedBypass = _mergeBypassDomainWithForceDirect(
+        currentBypass,
+        forceDirectDomains,
+      );
+
+      if (_sameStringList(currentBypass, mergedBypass)) {
+        return;
+      }
+
+      config = config.copyWith(
+        networkProps: config.networkProps.copyWith(
+          bypassDomain: mergedBypass,
+        ),
+      );
+    } catch (_) {}
+  }
+
+  List<String> _mergeBypassDomainWithForceDirect(
+    List<String> bypassDomain,
+    List<String> forceDirectDomains,
+  ) {
+    final merged = List<String>.from(bypassDomain);
+    final existing = <String>{
+      ...bypassDomain
+          .map((item) => item.trim().toLowerCase())
+          .where((item) => item.isNotEmpty),
+    };
+
+    final hosts = DirectDomainMatcher.normalizeDomainList(forceDirectDomains);
+    void addPattern(String pattern) {
+      final key = pattern.trim().toLowerCase();
+      if (key.isEmpty || !existing.add(key)) {
+        return;
+      }
+      merged.add(pattern);
+    }
+
+    for (final host in hosts) {
+      addPattern(host);
+      addPattern('*.$host');
+    }
+
+    return merged;
+  }
+
+  bool _sameStringList(List<String> a, List<String> b) {
+    if (a.length != b.length) {
+      return false;
+    }
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) {
+        return false;
+      }
+    }
+    return true;
   }
 
   String get ua => config.patchClashConfig.globalUa ?? packageInfo.ua;
@@ -283,11 +352,15 @@ class GlobalState {
 
   CoreState getCoreState() {
     final currentProfile = config.currentProfile;
+    final bypassDomain = _mergeBypassDomainWithForceDirect(
+      config.networkProps.bypassDomain,
+      ConfigFileLoaderHelper.getCachedForceDirectDomains(),
+    );
     return CoreState(
       vpnProps: config.vpnProps,
       onlyStatisticsProxy: config.appSetting.onlyStatisticsProxy,
       currentProfileName: currentProfile?.label ?? currentProfile?.id ?? "",
-      bypassDomain: config.networkProps.bypassDomain,
+      bypassDomain: bypassDomain,
     );
   }
 
@@ -310,7 +383,7 @@ class GlobalState {
   }) async {
     final profile = config.currentProfile;
     if (profile == null) {
-      return {};
+      throw "未选择配置，无法生成运行配置，请先选择一个配置/订阅";
     }
     final profileId = profile.id;
     final configMap = await getProfileConfig(profileId);
@@ -433,6 +506,32 @@ class GlobalState {
         rules = [...overrideData.runningRule, ...rules];
       }
     }
+
+    final forceDirectDomains =
+        await ConfigFileLoaderHelper.getForceDirectDomains();
+    if (forceDirectDomains.isNotEmpty) {
+      final forceDirectRules = <String>[];
+      final currentRuleSet = <String>{
+        ...rules
+            .whereType<String>()
+            .map((item) => item.trim().toLowerCase())
+            .where((item) => item.isNotEmpty),
+      };
+
+      for (final host
+          in DirectDomainMatcher.normalizeDomainList(forceDirectDomains)) {
+        final rule = 'DOMAIN-SUFFIX,$host,DIRECT';
+        final key = rule.toLowerCase();
+        if (currentRuleSet.add(key)) {
+          forceDirectRules.add(rule);
+        }
+      }
+
+      if (forceDirectRules.isNotEmpty) {
+        rules = [...forceDirectRules, ...rules];
+      }
+    }
+
     rawConfig["rule"] = rules;
     return rawConfig;
   }
@@ -442,6 +541,9 @@ class GlobalState {
       true => clashLibHandler!.getConfig(profileId),
       false => clashCore.getConfig(profileId),
     };
+    if (configMap.isEmpty) {
+      throw "配置内容为空（可能还未下载完成/文件损坏），请先更新订阅后重试";
+    }
     configMap["rules"] = configMap["rule"];
     configMap.remove("rule");
     return configMap;

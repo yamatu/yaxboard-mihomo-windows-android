@@ -3,6 +3,8 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/state.dart';
+import 'package:fl_clash/xboard/config/utils/config_file_loader.dart';
+import 'package:fl_clash/xboard/infrastructure/network/direct_domain_matcher.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -11,6 +13,35 @@ import 'app.dart';
 import 'config.dart';
 
 part 'generated/state.g.dart';
+
+List<String> _mergeBypassWithForceDirect(List<String> bypassDomain) {
+  final forceDomains = ConfigFileLoaderHelper.getCachedForceDirectDomains();
+  if (forceDomains.isEmpty) {
+    return bypassDomain;
+  }
+
+  final merged = List<String>.from(bypassDomain);
+  final existing = <String>{
+    ...bypassDomain
+        .map((item) => item.trim().toLowerCase())
+        .where((item) => item.isNotEmpty),
+  };
+
+  void addPattern(String pattern) {
+    final key = pattern.trim().toLowerCase();
+    if (key.isEmpty || !existing.add(key)) {
+      return;
+    }
+    merged.add(pattern);
+  }
+
+  for (final host in DirectDomainMatcher.normalizeDomainList(forceDomains)) {
+    addPattern(host);
+    addPattern('*.$host');
+  }
+
+  return merged;
+}
 
 @riverpod
 Config configState(Ref ref) {
@@ -94,12 +125,16 @@ NavigationItemsState currentNavigationsState(Ref ref) {
 @riverpod
 CoreState coreState(Ref ref) {
   final vpnProps = ref.watch(vpnSettingProvider);
+  final bypassDomainRaw =
+      ref.watch(networkSettingProvider.select((state) => state.bypassDomain));
+  final bypassDomain = _mergeBypassWithForceDirect(bypassDomainRaw);
   final currentProfile = ref.watch(currentProfileProvider);
   final onlyStatisticsProxy = ref.watch(appSettingProvider).onlyStatisticsProxy;
   return CoreState(
     vpnProps: vpnProps,
     onlyStatisticsProxy: onlyStatisticsProxy,
     currentProfileName: currentProfile?.label ?? currentProfile?.id ?? "",
+    bypassDomain: bypassDomain,
   );
 }
 
@@ -134,7 +169,7 @@ ProxyState proxyState(Ref ref) {
   final vm2 = ref.watch(networkSettingProvider.select(
     (state) => VM2(
       a: state.systemProxy,
-      b: state.bypassDomain,
+      b: _mergeBypassWithForceDirect(state.bypassDomain),
     ),
   ));
   final mixedPort = ref.watch(

@@ -178,8 +178,32 @@ func readFile(path string) ([]byte, error) {
 }
 
 func updateConfig(params *UpdateParams) {
+	// 防御性处理: 避免因为极端情况下的空指针等原因导致 updateConfig 直接 panic,
+	// 进而把整个核心进程一起崩溃。这里捕获 panic 并打印日志, 放弃本次增量更新,
+	// 后续仍可以通过完整的 setupConfig 重新下发最新配置。
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorln("[APP] updateConfig panic: %v", r)
+		}
+	}()
+
 	runLock.Lock()
 	defer runLock.Unlock()
+	if currentConfig == nil {
+		// 尚未完成完整的配置加载(setupConfig), 忽略本次增量更新以避免空指针崩溃。
+		// 这种情况通常出现在核心刚重启且仍在初始化过程中, 后续的 setupConfig 会下发最新配置。
+		return
+	}
+	// mihomo 的 Config.General / Config.Controller 等字段本身是指针,
+	// 在极端情况下(配置解析失败或尚未完整初始化)可能为 nil。为了避免
+	// updateConfig 在首次调用或异常解析后解引用空指针导致进程崩溃,
+	// 这里为这些关键字段补充默认实例。
+	if currentConfig.General == nil {
+		currentConfig.General = &config.General{}
+	}
+	if currentConfig.Controller == nil {
+		currentConfig.Controller = &config.Controller{}
+	}
 	general := currentConfig.General
 	if params.MixedPort != nil {
 		general.MixedPort = *params.MixedPort
@@ -224,12 +248,23 @@ func updateConfig(params *UpdateParams) {
 	}
 
 	if params.Tun != nil {
+		// 仅在字段非空时才覆盖, 防止 JSON 中缺失字段导致空指针崩溃。
 		general.Tun.Enable = params.Tun.Enable
-		general.Tun.AutoRoute = *params.Tun.AutoRoute
-		general.Tun.Device = *params.Tun.Device
-		general.Tun.RouteAddress = *params.Tun.RouteAddress
-		general.Tun.DNSHijack = *params.Tun.DNSHijack
-		general.Tun.Stack = *params.Tun.Stack
+		if params.Tun.AutoRoute != nil {
+			general.Tun.AutoRoute = *params.Tun.AutoRoute
+		}
+		if params.Tun.Device != nil {
+			general.Tun.Device = *params.Tun.Device
+		}
+		if params.Tun.RouteAddress != nil {
+			general.Tun.RouteAddress = *params.Tun.RouteAddress
+		}
+		if params.Tun.DNSHijack != nil {
+			general.Tun.DNSHijack = *params.Tun.DNSHijack
+		}
+		if params.Tun.Stack != nil {
+			general.Tun.Stack = *params.Tun.Stack
+		}
 	}
 
 	updateListeners()

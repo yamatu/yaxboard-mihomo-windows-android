@@ -155,10 +155,7 @@ class PortItem extends ConsumerWidget {
   const PortItem({super.key});
 
   handleShowPortDialog() async {
-    await globalState.showCommonDialog(
-      child: _PortDialog(),
-    );
-    // inputDelegate.onChanged(value);
+    await showPortConfigDialog();
   }
 
   @override
@@ -445,6 +442,13 @@ final generalItems = <Widget>[
     )
     .toList();
 
+/// 在任意页面弹出端口配置对话框
+Future<void> showPortConfigDialog() async {
+  await globalState.showCommonDialog(
+    child: const _PortDialog(),
+  );
+}
+
 class _PortDialog extends ConsumerStatefulWidget {
   const _PortDialog();
 
@@ -500,15 +504,20 @@ class _PortDialogState extends ConsumerState<_PortDialog> {
     if (res != true) {
       return;
     }
+    // 重置为默认端口配置:
+    // - mixed-port: 22812
+    // - 其他端口全部关闭(0 表示禁用)
     ref.read(patchClashConfigProvider.notifier).updateState(
-          (state) => state.copyWith(
-            mixedPort: 7890,
-            port: 0,
-            socksPort: 0,
-            redirPort: 0,
-            tproxyPort: 0,
-          ),
-        );
+      (state) => state.copyWith(
+        mixedPort: 22812,
+        port: 0,
+        socksPort: 0,
+        redirPort: 0,
+        tproxyPort: 0,
+      ),
+    );
+    // 端口变更后需要重新应用配置, 确保核心和 UI 同步
+    globalState.appController.applyProfileDebounce(silence: true);
     if (mounted) {
       Navigator.of(context).pop();
     }
@@ -516,15 +525,18 @@ class _PortDialogState extends ConsumerState<_PortDialog> {
 
   _handleUpdate() {
     if (_formKey.currentState?.validate() == false) return;
+    // 更新 Clash 配置中的所有端口相关字段
     ref.read(patchClashConfigProvider.notifier).updateState(
-          (state) => state.copyWith(
-            mixedPort: int.parse(_mixedPortController.text),
-            port: int.parse(_portController.text),
-            socksPort: int.parse(_socksPortController.text),
-            redirPort: int.parse(_redirPortController.text),
-            tproxyPort: int.parse(_tProxyPortController.text),
-          ),
-        );
+      (state) => state.copyWith(
+        mixedPort: int.parse(_mixedPortController.text),
+        port: int.parse(_portController.text),
+        socksPort: int.parse(_socksPortController.text),
+        redirPort: int.parse(_redirPortController.text),
+        tproxyPort: int.parse(_tProxyPortController.text),
+      ),
+    );
+    // 端口修改后重新应用当前配置, 让 HTTP / SOCKS5 / Mixed 端口立刻生效
+    globalState.appController.applyProfileDebounce(silence: true);
     Navigator.of(context).pop();
   }
 

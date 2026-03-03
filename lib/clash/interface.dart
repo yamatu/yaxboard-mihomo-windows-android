@@ -203,6 +203,14 @@ abstract class ClashHandlerInterface with ClashInterface {
     return invoke<String>(
       method: ActionMethod.validateConfig,
       data: data,
+      // 配置校验本质上是一次轻量级的 YAML 解析, 正常情况下应在较短时间内完成。
+      // 这里显式设置一个相对较小的超时时间, 避免在核心重启或控制通道异常时,
+      // 前端长时间等待导致订阅导入“卡死”的体验。
+      timeout: const Duration(seconds: 10),
+      // 超时或其他异常时, 直接返回空字符串视为“校验通过”, 后续由更严谨的
+      // setupConfig 阶段再次做完整校验, 这样可以避免因为瞬时核心不可用
+      // 而完全阻塞订阅导入流程。
+      defaultValue: "",
     );
   }
 

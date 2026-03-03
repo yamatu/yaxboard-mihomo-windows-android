@@ -55,7 +55,8 @@ class ApplicationState extends ConsumerState<Application> {
   void initState() {
     super.initState();
     _autoUpdateGroupTask();
-    _autoUpdateProfilesTask();
+    // 不再在启动时自动轮询更新订阅, 只保留手动更新
+    // _autoUpdateProfilesTask();
     globalState.appController = AppController(context, ref);
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) async {
       final currentContext = globalState.navigatorKey.currentContext;
@@ -280,9 +281,13 @@ class ApplicationState extends ConsumerState<Application> {
         final isInitialized = userState.isInitialized;
         final isLoginPage = state.uri.path == '/login';
 
-        // 初始化中，显示加载页面
+        // 初始化中也不再强制跳转到 /loading, 避免某些环境下卡在加载页
+        // 直接按“未登录”状态处理, 快速展示登录页, 后台继续做 quickAuth
         if (!isInitialized) {
-          return '/loading';
+          if (!isAuthenticated && !isLoginPage) {
+            return '/login';
+          }
+          return null;
         }
 
         // 未认证且不在登录页，跳转到登录页

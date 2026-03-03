@@ -105,18 +105,16 @@ class RemoteConfigSettings {
   }
 
   bool validate() {
-    return sources.isNotEmpty && 
-           maxRetries > 0 && 
+    // 远程配置源允许为空:
+    // - 对于纯本地配置场景, 可以完全依赖打包内置的 config.json / remote.config.json
+    // - 当 sources 为空时, RemoteConfigManager 会优先使用默认/本地配置源
+    return maxRetries > 0 && 
            timeout.inSeconds > 0 && 
            retryDelay.inSeconds >= 0;
   }
 
   List<String> getValidationErrors() {
     final errors = <String>[];
-
-    if (sources.isEmpty) {
-      errors.add('Remote config sources cannot be empty');
-    }
 
     if (maxRetries <= 0) {
       errors.add('Max retries must be greater than 0');

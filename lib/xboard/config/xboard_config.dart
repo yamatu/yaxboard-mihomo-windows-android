@@ -98,7 +98,10 @@ class _XBoardConfigProvider implements ConfigProviderInterface {
     );
     
     // 竞速失败直接返回 null，不回退
-    if (racingResult == null) return null;
+    if (racingResult == null) {
+      XBoardConfig._lastRacingResult = null;
+      return null;
+    }
     
     // 保存竞速结果中的代理配置（供 SDK 使用）
     XBoardConfig._lastRacingResult = racingResult;
@@ -184,6 +187,7 @@ class XBoardConfig {
     _instance?.dispose();
     _instance = null;
     _provider = null;
+    _lastRacingResult = null;
     ModuleInitializer.reset();
   }
   
@@ -222,7 +226,10 @@ class XBoardConfig {
       proxyUrls: proxyUrls,
     );
     
-    if (racingResult == null) return null;
+    if (racingResult == null) {
+      _lastRacingResult = null;
+      return null;
+    }
     
     // 保存竞速结果
     _lastRacingResult = racingResult;

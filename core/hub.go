@@ -84,7 +84,7 @@ func handleShutdown() bool {
 }
 
 func handleValidateConfig(bytes []byte) string {
-	_, err := config.UnmarshalRawConfig(bytes)
+	_, err := parseRawConfigWithSubscriptionCompat(bytes)
 	if err != nil {
 		return err.Error()
 	}
@@ -429,7 +429,7 @@ func handleGetConfig(path string) (*config.RawConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	prof, err := config.UnmarshalRawConfig(bytes)
+	prof, err := parseRawConfigWithSubscriptionCompat(bytes)
 	if err != nil {
 		return nil, err
 	}

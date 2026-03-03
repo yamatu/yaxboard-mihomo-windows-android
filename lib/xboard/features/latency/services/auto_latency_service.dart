@@ -164,7 +164,11 @@ class AutoLatencyService {
       _logger.error('指定节点延迟测试失败', e);
     }
   }
-  Future<void> testCurrentGroupNodes({int maxNodes = 5}) async {
+  /// 批量测试当前分组的节点
+  ///
+  /// [maxNodes] 为 0 或小于等于 0 时表示测试当前组的所有节点
+  /// 大于 0 时仅测试前 maxNodes 个节点
+  Future<void> testCurrentGroupNodes({int maxNodes = 0}) async {
     if (!_ensureServiceActive()) {
       return;
     }
@@ -178,9 +182,16 @@ class AutoLatencyService {
         _logger.debug('未找到当前组或组为空，跳过批量测试');
         return;
       }
-      final nodesToTest = currentGroup.all.take(maxNodes).toList();
-      _logger.info('AutoLatencyService', '开始批量测试当前组 ${currentGroup.name} 的节点，数量: ${nodesToTest.length}');
-      _logger.debug('AutoLatencyService', '测试节点列表: ${nodesToTest.map((p) => p.name).join(', ')}');
+
+      // 根据 maxNodes 计算需要测试的节点列表
+      final allNodes = currentGroup.all;
+      final nodesToTest = (maxNodes <= 0 || maxNodes >= allNodes.length)
+          ? List<Proxy>.from(allNodes)
+          : allNodes.take(maxNodes).toList();
+
+      // 这里只是普通的信息日志, 不应该带上 "Error" 前缀, 避免误导用户以为是错误
+      _logger.info('开始批量测试当前组 ${currentGroup.name} 的节点，数量: ${nodesToTest.length}');
+      _logger.debug('测试节点列表: ${nodesToTest.map((p) => p.name).join(', ')}');
       final testUrl = _ref!.read(appSettingProvider).testUrl;
       await proxies_common.delayTest(nodesToTest, testUrl);
       _logger.info('批量延迟测试完成');

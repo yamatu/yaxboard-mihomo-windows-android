@@ -40,7 +40,51 @@ class AppPath {
   }
 
   String get corePath {
-    return join(executableDirPath, "FlClashCore$executableExtension");
+    // 根据当前平台确定 libclash 子目录名称
+    final String platformDir;
+    if (Platform.isWindows) {
+      platformDir = "windows";
+    } else if (Platform.isLinux) {
+      platformDir = "linux";
+    } else if (Platform.isMacOS) {
+      platformDir = "macos";
+    } else {
+      // 其他平台目前不支持独立核心进程
+      return join(executableDirPath, "FlClashCore$executableExtension");
+    }
+
+    final List<String> candidates = [];
+
+    // 1. 优先使用与可执行文件同目录下的核心程序（打包/安装后的正常路径）
+    candidates.add(
+      join(executableDirPath, "FlClashCore$executableExtension"),
+    );
+
+    // 2. 开发环境下使用 `flutter run` 或 `flutter build` 时:
+    //    可执行文件一般位于 build/<platform>/x64/runner/Debug 或类似目录中。
+    //    向上逐级查找项目根目录, 在每一层尝试拼接 libclash/<platform>/FlClashCore
+    var parentDir = executableDirPath;
+    for (var i = 0; i < 6; i++) {
+      parentDir = dirname(parentDir);
+      candidates.add(
+        join(
+          parentDir,
+          "libclash",
+          platformDir,
+          "FlClashCore$executableExtension",
+        ),
+      );
+    }
+
+    // 依次返回第一个真实存在的路径
+    for (final path in candidates) {
+      if (File(path).existsSync()) {
+        return path;
+      }
+    }
+
+    // 如果都不存在, 返回与可执行文件同目录的默认路径, 方便后续在日志中排查
+    return candidates.first;
   }
 
   String get helperPath {

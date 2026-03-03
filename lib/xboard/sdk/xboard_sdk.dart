@@ -25,6 +25,7 @@ library;
 import 'src/xboard_client.dart';
 import 'package:flutter_xboard_sdk/flutter_xboard_sdk.dart' as sdk;
 import 'package:fl_clash/xboard/core/core.dart';
+import 'package:fl_clash/xboard/config/xboard_config.dart';
 import 'package:fl_clash/xboard/config/interface/config_provider_interface.dart';
 
 
@@ -83,7 +84,30 @@ class XBoardSDK {
 
   // 内部获取 SDK Client
   static XBoardClient get _client => XBoardClient.instance;
-  static sdk.XBoardSDK get _sdk => _client.sdk;
+
+  /// 获取已初始化的底层 SDK
+  ///
+  /// 说明：
+  /// - 部分设备在应用启动早期可能因为网络未就绪/配置加载异常导致首次 initialize() 失败
+  /// - 旧实现初始化失败后无法重试（Completer 锁死），并且上层只看到“未初始化”
+  /// - 这里统一在每次 API 调用前做一次“懒加载初始化”，确保可重试且错误更可控
+  static Future<sdk.XBoardSDK> _getSdk() async {
+    if (_client.isInitialized) {
+      return _client.sdk;
+    }
+
+    // 尝试用当前配置做一次自动初始化（允许重试）
+    if (XBoardConfig.isInitialized) {
+      _logger.info('[SDK] 检测到 SDK 未初始化，尝试自动初始化/重试初始化');
+      await initialize(configProvider: XBoardConfig.provider);
+      return _client.sdk;
+    }
+
+    throw XBoardConfigException(
+      message: 'XBoardConfig 未初始化，无法自动初始化 SDK，请先完成配置初始化',
+      code: 'CONFIG_NOT_INITIALIZED',
+    );
+  }
 
   // ========== 生命周期管理 ==========
 
@@ -129,8 +153,9 @@ class XBoardSDK {
     required String password,
   }) async {
     try {
+      final sdkClient = await _getSdk();
       // 使用 loginWithCredentials 方法，它会自动保存 auth_data token
-      final success = await _sdk.loginWithCredentials(email, password);
+      final success = await sdkClient.loginWithCredentials(email, password);
       if (success) {
         _logger.info('[SDK] 登录成功，authData token已保存');
         return true;
@@ -154,7 +179,8 @@ class XBoardSDK {
     String? inviteCode,
   }) async {
     try {
-      await _sdk.register.register(
+      final sdkClient = await _getSdk();
+      await sdkClient.register.register(
         email,
         password,
         inviteCode,  // 可以传 null，API 内部会判断
@@ -171,7 +197,8 @@ class XBoardSDK {
   /// 登出
   static Future<bool> logout() async {
     try {
-      await _sdk.clearToken();
+      final sdkClient = await _getSdk();
+      await sdkClient.clearToken();
       return true;
     } catch (e) {
       _logger.error('[SDK] 登出失败', e);
@@ -186,7 +213,8 @@ class XBoardSDK {
     required String emailCode,
   }) async {
     try {
-      final result = await _sdk.resetPassword.resetPassword(
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.resetPassword.resetPassword(
         email: email,
         password: password,
         emailCode: emailCode,
@@ -201,7 +229,8 @@ class XBoardSDK {
   /// 发送验证码
   static Future<bool> sendVerificationCode(String email) async {
     try {
-      final result = await _sdk.sendEmailCode.sendEmailCode(email);
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.sendEmailCode.sendEmailCode(email);
       return result.success;
     } catch (e) {
       _logger.error('[SDK] 发送验证码失败', e);
@@ -212,7 +241,8 @@ class XBoardSDK {
   /// 检查是否已登录
   static Future<bool> isLoggedIn() async {
     try {
-      return _sdk.isAuthenticated;
+      final sdkClient = await _getSdk();
+      return sdkClient.isAuthenticated;
     } catch (e) {
       return false;
     }
@@ -221,7 +251,8 @@ class XBoardSDK {
   /// 获取认证Token
   static Future<String?> getAuthToken() async {
     try {
-      return await _sdk.getToken();
+      final sdkClient = await _getSdk();
+      return await sdkClient.getToken();
     } catch (e) {
       _logger.error('[SDK] 获取认证Token失败', e);
       return null;
@@ -233,7 +264,8 @@ class XBoardSDK {
   /// 获取用户信息
   static Future<sdk.UserInfo?> getUserInfo() async {
     try {
-      final result = await _sdk.userInfo.getUserInfo();
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.userInfo.getUserInfo();
       return result.data;
     } catch (e) {
       _logger.error('[SDK] 获取用户信息失败', e);
@@ -244,7 +276,8 @@ class XBoardSDK {
   /// 验证 Token 是否有效
   static Future<bool> validateToken() async {
     try {
-      final result = await _sdk.userInfo.validateToken();
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.userInfo.validateToken();
       return result.data ?? false;
     } catch (e) {
       _logger.error('[SDK] 验证Token失败', e);
@@ -255,7 +288,8 @@ class XBoardSDK {
   /// 切换流量提醒
   static Future<bool> toggleTrafficReminder(bool enabled) async {
     try {
-      await _sdk.userInfo.toggleTrafficReminder(enabled);
+      final sdkClient = await _getSdk();
+      await sdkClient.userInfo.toggleTrafficReminder(enabled);
       return true;
     } catch (e) {
       _logger.error('[SDK] 切换流量提醒失败', e);
@@ -266,7 +300,8 @@ class XBoardSDK {
   /// 切换到期提醒
   static Future<bool> toggleExpireReminder(bool enabled) async {
     try {
-      await _sdk.userInfo.toggleExpireReminder(enabled);
+      final sdkClient = await _getSdk();
+      await sdkClient.userInfo.toggleExpireReminder(enabled);
       return true;
     } catch (e) {
       _logger.error('[SDK] 切换到期提醒失败', e);
@@ -279,7 +314,8 @@ class XBoardSDK {
   /// 获取套餐列表
   static Future<List<sdk.Plan>> getPlans() async {
     try {
-      final result = await _sdk.plan.fetchPlans();
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.plan.fetchPlans();
       return result.data ?? [];
     } catch (e) {
       _logger.error('[SDK] 获取套餐列表失败', e);
@@ -292,7 +328,8 @@ class XBoardSDK {
   /// 获取订阅信息
   static Future<sdk.SubscriptionInfo?> getSubscription() async {
     try {
-      final result = await _sdk.subscription.getSubscriptionInfo();
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.subscription.getSubscriptionInfo();
       return result;
     } catch (e) {
       _logger.error('[SDK] 获取订阅信息失败', e);
@@ -309,7 +346,8 @@ class XBoardSDK {
     String? couponCode,
   }) async {
     try {
-      final result = await _sdk.order.createOrder(
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.order.createOrder(
         planId: planId,
         period: period,
         couponCode: couponCode,
@@ -325,7 +363,8 @@ class XBoardSDK {
   /// 获取订单列表
   static Future<List<sdk.Order>> getOrders() async {
     try {
-      final result = await _sdk.order.fetchUserOrders();
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.order.fetchUserOrders();
       return result.data;
     } catch (e) {
       _logger.error('[SDK] 获取订单列表失败', e);
@@ -336,7 +375,8 @@ class XBoardSDK {
   /// 根据订单号获取订单详情
   static Future<sdk.Order?> getOrderByTradeNo(String tradeNo) async {
     try {
-      final result = await _sdk.order.getOrderDetails(tradeNo);
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.order.getOrderDetails(tradeNo);
       return result;
     } catch (e) {
       _logger.error('[SDK] 获取订单详情失败', e);
@@ -347,7 +387,8 @@ class XBoardSDK {
   /// 取消订单
   static Future<bool> cancelOrder(String tradeNo) async {
     try {
-      final result = await _sdk.order.cancelOrder(tradeNo);
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.order.cancelOrder(tradeNo);
       return result.success;
     } catch (e) {
       _logger.error('[SDK] 取消订单失败', e);
@@ -360,7 +401,8 @@ class XBoardSDK {
   /// 获取支付方式列表
   static Future<List<sdk.PaymentMethodInfo>> getPaymentMethods() async {
     try {
-      final result = await _sdk.payment.getPaymentMethods();
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.payment.getPaymentMethods();
       // API返回PaymentMethodInfo列表，PaymentMethod是其别名
       return result.data ?? [];
     } catch (e) {
@@ -378,7 +420,8 @@ class XBoardSDK {
     required int method,
   }) async {
     try {
-      final result = await _sdk.order.submitPayment(
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.order.submitPayment(
         tradeNo: tradeNo,
         method: method.toString(),
       );
@@ -397,7 +440,8 @@ class XBoardSDK {
   /// 查询支付状态
   static Future<int?> checkPaymentStatus(String tradeNo) async {
     try {
-      final result = await _sdk.payment.checkPaymentStatus(tradeNo);
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.payment.checkPaymentStatus(tradeNo);
       final paymentResult = result.data;
       if (paymentResult != null) {
         if (paymentResult.isSuccess) return 3;  // 支付成功
@@ -416,7 +460,8 @@ class XBoardSDK {
   /// 获取邀请信息
   static Future<sdk.InviteInfo?> getInviteInfo() async {
     try {
-      final result = await _sdk.invite.getInviteInfo();
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.invite.getInviteInfo();
       return result.data;
     } catch (e) {
       _logger.error('[SDK] 获取邀请信息失败', e);
@@ -427,7 +472,8 @@ class XBoardSDK {
   /// 生成邀请码
   static Future<sdk.InviteCode?> generateInviteCode() async {
     try {
-      await _sdk.invite.generateInviteCode();
+      final sdkClient = await _getSdk();
+      await sdkClient.invite.generateInviteCode();
       // API返回void，需要重新获取邀请信息来获取新生成的码
       final info = await getInviteInfo();
       if (info != null && info.codes.isNotEmpty) {
@@ -447,7 +493,8 @@ class XBoardSDK {
   }) async {
     try {
       // SDK的fetchCommissionDetails需要分页参数
-      final result = await _sdk.invite.fetchCommissionDetails(
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.invite.fetchCommissionDetails(
         current: current,
         pageSize: pageSize,
       );
@@ -471,7 +518,8 @@ class XBoardSDK {
     try {
       _logger.info('[SDK] 申请提现: 方式=$withdrawMethod, 账号=$withdrawAccount');
       
-      final result = await _sdk.balance.withdrawFunds(withdrawMethod, withdrawAccount);
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.balance.withdrawFunds(withdrawMethod, withdrawAccount);
       
       return result;  // WithdrawResult 已经是正确的类型
     } catch (e) {
@@ -488,7 +536,8 @@ class XBoardSDK {
       final amountInCents = (amount * 100).round(); // 转换为分
       _logger.info('[SDK] 划转佣金: ¥$amount (${amountInCents}分)');
       
-      final result = await _sdk.balance.transferCommission(amountInCents);
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.balance.transferCommission(amountInCents);
       
       return result;  // TransferResult 已经是正确的类型
     } catch (e) {
@@ -505,7 +554,8 @@ class XBoardSDK {
     required int planId,
   }) async {
     try {
-      final result = await _sdk.coupon.checkCoupon(code, planId);
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.coupon.checkCoupon(code, planId);
       // 返回完整的优惠券数据，包含折扣类型和金额
       return result.data;
     } catch (e) {
@@ -519,7 +569,8 @@ class XBoardSDK {
   /// 获取工单列表
   static Future<List<sdk.Ticket>> getTickets() async {
     try {
-      final result = await _sdk.ticket.fetchTickets();
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.ticket.fetchTickets();
       return result.data ?? [];
     } catch (e) {
       _logger.error('[SDK] 获取工单列表失败', e);
@@ -534,7 +585,8 @@ class XBoardSDK {
     required int level,
   }) async {
     try {
-      final result = await _sdk.ticket.createTicket(
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.ticket.createTicket(
         subject: subject,
         message: message,
         level: level,
@@ -549,7 +601,8 @@ class XBoardSDK {
   /// 获取工单详情
   static Future<sdk.TicketDetail?> getTicketDetail(int id) async {
     try {
-      final result = await _sdk.ticket.getTicketDetail(id);
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.ticket.getTicketDetail(id);
       // TicketDetail就是Ticket的别名
       return result.data;
     } catch (e) {
@@ -564,7 +617,8 @@ class XBoardSDK {
     required String message,
   }) async {
     try {
-      final result = await _sdk.ticket.replyTicket(
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.ticket.replyTicket(
         ticketId: id,
         message: message,
       );
@@ -578,7 +632,8 @@ class XBoardSDK {
   /// 关闭工单
   static Future<bool> closeTicket(int id) async {
     try {
-      final result = await _sdk.ticket.closeTicket(id);
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.ticket.closeTicket(id);
       return result.success;
     } catch (e) {
       _logger.error('[SDK] 关闭工单失败', e);
@@ -591,7 +646,8 @@ class XBoardSDK {
   /// 获取公告列表
   static Future<List<sdk.Notice>> getNotices() async {
     try {
-      final result = await _sdk.notice.fetchNotices();
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.notice.fetchNotices();
       return result.data ?? [];
     } catch (e) {
       _logger.error('[SDK] 获取公告列表失败', e);
@@ -604,7 +660,8 @@ class XBoardSDK {
   /// 获取应用配置
   static Future<dynamic> getConfig() async {
     try {
-      final result = await _sdk.config.getConfig();
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.config.getConfig();
       return result;  // ConfigData 本身就是数据
     } catch (e) {
       _logger.error('[SDK] 获取配置失败', e);
@@ -615,7 +672,8 @@ class XBoardSDK {
   /// 获取应用信息
   static Future<sdk.AppInfo?> getAppInfo() async {
     try {
-      final result = await _sdk.app.fetchDedicatedAppInfo();
+      final sdkClient = await _getSdk();
+      final result = await sdkClient.app.fetchDedicatedAppInfo();
       return result.data;
     } catch (e) {
       _logger.error('[SDK] 获取应用信息失败', e);

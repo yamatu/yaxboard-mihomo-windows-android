@@ -90,34 +90,30 @@ Future<void> _loadSecurityConfig() async {
 Future<void> _initializeXBoardServices() async {
   try {
     print('[Main] 开始初始化XBoard配置模块...');
-    
+
     // 1. 从配置文件加载配置（开源友好：用户只需修改 xboard.config.yaml）
     final configSettings = await ConfigFileLoader.loadFromFile();
     print('[Main] 配置文件加载成功，Provider: ${configSettings.currentProvider}');
-    
+
     // 2. 加载安全配置（UA、证书、解密密钥等）
     await _loadSecurityConfig();
     print('[Main] 安全配置加载成功');
-    
-    // 3. 初始化V2配置模块
+
+    // 3. 初始化配置模块
     await XBoardConfig.initialize(settings: configSettings);
     print('[Main] XBoard配置模块初始化成功');
-    
-    // 3. 获取SDK配置
-    final sdkConfig = await ConfigFileLoaderHelper.getSdkConfig();
-    
+
     // 4. 初始化XBoard SDK（使用域名竞速）
     await XBoardSDK.initialize(
       configProvider: XBoardConfig.provider,
       baseUrl: null, // 没有基础URL，使用域名竞速自动选择最快的
     );
-    
+
     print('[Main] XBoard SDK初始化成功');
-    
-  } catch (e) {
-    print('[Main] XBoard服务初始化失败: $e');
-    // 没有域名就失败，不需要降级
-    rethrow;
+  } catch (e, stackTrace) {
+    // 降级处理：XBoard 初始化失败时不再阻断应用启动，记录错误并继续启动主界面
+    print('[Main] XBoard服务初始化失败，已启用降级模式: $e');
+    print('[Main] XBoard初始化异常堆栈: $stackTrace');
   }
 }
 

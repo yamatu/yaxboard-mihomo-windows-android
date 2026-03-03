@@ -15,7 +15,8 @@ const defaultTun = Tun(enable: true);
 const defaultDns = Dns();
 const defaultGeoXUrl = GeoXUrl();
 
-const defaultMixedPort = 7890;
+// Clash 默认混合端口改为 22812，避免和其他常用代理端口(如 7890)冲突
+const defaultMixedPort = 22812;
 const defaultKeepAliveInterval = 30;
 
 const defaultBypassPrivateRouteAddress = [

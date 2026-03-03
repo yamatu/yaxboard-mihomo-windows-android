@@ -104,8 +104,13 @@ class _NodeSelectorBarState extends ConsumerState<NodeSelectorBar> {
     }
     final selectedProxyName = selectedMap[currentGroup.name] ?? "";
     String realNodeName;
+    // 对于 URLTest 分组, 优先使用用户手动选择的节点名称, 若没有再回退到当前测速结果(now)
     if (currentGroup.type == GroupType.URLTest) {
-      realNodeName = currentGroup.now ?? "";
+      if (selectedProxyName.isNotEmpty) {
+        realNodeName = selectedProxyName;
+      } else {
+        realNodeName = currentGroup.now ?? "";
+      }
     } else {
       realNodeName = currentGroup.getCurrentSelectedName(selectedProxyName);
     }

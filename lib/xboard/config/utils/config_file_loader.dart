@@ -2,19 +2,21 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:yaml/yaml.dart';
 import '../core/config_settings.dart';
 import '../../core/core.dart';
+import '../../infrastructure/network/direct_domain_matcher.dart';
 
 // 初始化文件级日志器
 final _logger = FileLogger('config_file_loader.dart');
+List<String> _cachedForceDirectDomains = const [];
 
 /// 配置文件加载器
-/// 
+///
 /// 从 assets/config/xboard.config.yaml 加载 XBoard 配置
 class ConfigFileLoader {
   /// 配置文件路径
   static const String configPath = 'assets/config/xboard.config.yaml';
-  
+
   /// 加载配置文件
-  /// 
+  ///
   /// 从 assets/config/xboard.config.yaml 加载配置
   static Future<ConfigSettings> loadFromFile() async {
     try {
@@ -27,23 +29,25 @@ class ConfigFileLoader {
       return const ConfigSettings();
     }
   }
-  
+
   /// 解析 YAML 配置字符串
   static ConfigSettings _parseYamlString(String yamlString) {
     try {
       // 解析 YAML
       final yamlDoc = loadYaml(yamlString);
       final configMap = _yamlToMap(yamlDoc);
-      
+
       // 获取 xboard 配置节点
       final xboardConfig = configMap['xboard'] as Map<String, dynamic>? ?? {};
-      
+
       // 提取配置参数
       final provider = xboardConfig['provider'] as String? ?? 'Flclash';
-      final remoteConfigJson = xboardConfig['remote_config'] as Map<String, dynamic>? ?? {};
-      final subscriptionJson = xboardConfig['subscription'] as Map<String, dynamic>? ?? {};
+      final remoteConfigJson =
+          xboardConfig['remote_config'] as Map<String, dynamic>? ?? {};
+      final subscriptionJson =
+          xboardConfig['subscription'] as Map<String, dynamic>? ?? {};
       final logJson = xboardConfig['log'] as Map<String, dynamic>? ?? {};
-      
+
       // 构建配置对象
       return ConfigSettings(
         currentProvider: provider,
@@ -56,7 +60,7 @@ class ConfigFileLoader {
       rethrow;
     }
   }
-  
+
   /// 将 YAML 转换为 Map（或其他类型）
   static dynamic _yamlToMap(dynamic yaml) {
     if (yaml is YamlMap) {
@@ -71,21 +75,21 @@ class ConfigFileLoader {
       return yaml;
     }
   }
-  
+
   /// 解析远程配置
   static RemoteConfigSettings _parseRemoteConfig(Map<String, dynamic> json) {
     final sourcesList = json['sources'] as List<dynamic>? ?? [];
     _logger.info('[ConfigLoader] 解析远程配置源: ${sourcesList.length} 个源');
-    
+
     final sources = sourcesList
         .map((item) => _parseRemoteSource(item as Map<String, dynamic>))
         .toList();
-    
+
     _logger.info('[ConfigLoader] 成功解析 ${sources.length} 个配置源');
     for (final source in sources) {
       _logger.info('[ConfigLoader] - ${source.name}: ${source.url}');
     }
-    
+
     return RemoteConfigSettings(
       sources: sources,
       maxRetries: json['max_retries'] as int? ?? 3,
@@ -93,27 +97,29 @@ class ConfigFileLoader {
       retryDelay: Duration(seconds: json['retry_delay_seconds'] as int? ?? 2),
     );
   }
-  
+
   /// 解析远程源配置
   static RemoteSourceConfig _parseRemoteSource(Map<String, dynamic> json) {
     return RemoteSourceConfig(
       name: json['name'] as String? ?? '',
       url: json['url'] as String? ?? '',
-      headers: (json['headers'] as Map<String, dynamic>?)?.cast<String, String>(),
-      timeout: json['timeout_seconds'] != null 
+      headers:
+          (json['headers'] as Map<String, dynamic>?)?.cast<String, String>(),
+      timeout: json['timeout_seconds'] != null
           ? Duration(seconds: json['timeout_seconds'] as int)
           : null,
       encryptionKey: json['encryption_key'] as String?,
     );
   }
-  
+
   /// 解析订阅设置
-  static SubscriptionSettings _parseSubscriptionSettings(Map<String, dynamic> json) {
+  static SubscriptionSettings _parseSubscriptionSettings(
+      Map<String, dynamic> json) {
     return SubscriptionSettings(
       preferEncrypt: json['prefer_encrypt'] as bool? ?? false,
     );
   }
-  
+
   /// 解析日志设置
   static LogSettings _parseLogSettings(Map<String, dynamic> json) {
     return LogSettings(
@@ -122,16 +128,16 @@ class ConfigFileLoader {
       prefix: json['prefix'] as String? ?? '[XBoard]',
     );
   }
-  
+
   /// 获取配置文件的其他配置项
-  /// 
+  ///
   /// 从 assets/config/xboard.config.yaml 加载扩展配置
   static Future<Map<String, dynamic>> loadExtendedConfig() async {
     try {
       final yamlString = await rootBundle.loadString(configPath);
       final yamlDoc = loadYaml(yamlString);
       final configMap = _yamlToMap(yamlDoc);
-      
+
       return configMap['xboard'] as Map<String, dynamic>? ?? {};
     } catch (e) {
       _logger.error('加载扩展配置失败', e);
@@ -146,7 +152,8 @@ extension ConfigFileLoaderHelper on ConfigFileLoader {
   static Future<SubscriptionSettings> getSubscriptionSettings() async {
     try {
       final config = await ConfigFileLoader.loadExtendedConfig();
-      final subscriptionJson = config['subscription'] as Map<String, dynamic>? ?? {};
+      final subscriptionJson =
+          config['subscription'] as Map<String, dynamic>? ?? {};
       return SubscriptionSettings(
         preferEncrypt: subscriptionJson['prefer_encrypt'] as bool? ?? false,
       );
@@ -154,7 +161,7 @@ extension ConfigFileLoaderHelper on ConfigFileLoader {
       return const SubscriptionSettings();
     }
   }
-  
+
   /// 获取是否优先使用加密订阅
   static Future<bool> getPreferEncrypt() async {
     try {
@@ -164,7 +171,7 @@ extension ConfigFileLoaderHelper on ConfigFileLoader {
       return true;
     }
   }
-  
+
   /// 获取是否启用订阅URL竞速（自动跟随加密选项）
   static Future<bool> getEnableRace() async {
     try {
@@ -174,20 +181,19 @@ extension ConfigFileLoaderHelper on ConfigFileLoader {
       return true;
     }
   }
-  
+
   /// 获取延迟测试配置
   static Future<String> getLatencyTestUrl() async {
     try {
       final config = await ConfigFileLoader.loadExtendedConfig();
       final latencyTest = config['latency_test'] as Map<String, dynamic>? ?? {};
-      return latencyTest['test_url'] as String? ?? 'http://www.gstatic.com/generate_204';
+      return latencyTest['test_url'] as String? ??
+          'http://www.gstatic.com/generate_204';
     } catch (e) {
       return 'http://www.gstatic.com/generate_204';
     }
   }
-  
 
-  
   /// 获取 SDK 配置
   static Future<Map<String, dynamic>> getSdkConfig() async {
     try {
@@ -197,7 +203,7 @@ extension ConfigFileLoaderHelper on ConfigFileLoader {
       return {};
     }
   }
-  
+
   /// 获取应用配置
   static Future<Map<String, dynamic>> getAppConfig() async {
     try {
@@ -207,7 +213,7 @@ extension ConfigFileLoaderHelper on ConfigFileLoader {
       return {};
     }
   }
-  
+
   /// 获取安全配置
   static Future<Map<String, dynamic>> getSecurityConfig() async {
     try {
@@ -217,18 +223,19 @@ extension ConfigFileLoaderHelper on ConfigFileLoader {
       return {};
     }
   }
-  
+
   /// 获取解密密钥
   static Future<String> getDecryptKey() async {
     try {
       final config = await ConfigFileLoader.loadExtendedConfig();
-      final subscription = config['subscription'] as Map<String, dynamic>? ?? {};
+      final subscription =
+          config['subscription'] as Map<String, dynamic>? ?? {};
       return subscription['decrypt_key'] as String? ?? '';
     } catch (e) {
       return '';
     }
   }
-  
+
   /// 获取 User-Agent 配置
   static Future<Map<String, String>> getUserAgents() async {
     try {
@@ -239,16 +246,16 @@ extension ConfigFileLoaderHelper on ConfigFileLoader {
       return {};
     }
   }
-  
+
   /// 获取证书配置
   static Future<Map<String, dynamic>> getCertificateConfig() async {
     // 硬编码证书配置，不再从配置文件读取
     return {
       'path': 'assets/cer/client-cert.crt',
-      'enabled': true,
+      'enabled': false,
     };
   }
-  
+
   /// 获取应用标题
   static Future<String> getAppTitle() async {
     try {
@@ -258,7 +265,7 @@ extension ConfigFileLoaderHelper on ConfigFileLoader {
       return 'XBoard';
     }
   }
-  
+
   /// 获取应用网站地址
   static Future<String> getAppWebsite() async {
     try {
@@ -268,9 +275,9 @@ extension ConfigFileLoaderHelper on ConfigFileLoader {
       return 'example.com';
     }
   }
-  
+
   /// 获取混淆前缀字符串
-  /// 
+  ///
   /// 返回配置文件中的混淆前缀，如果未配置或配置为 null 则返回 null
   /// 用于 Caddy 反代等场景的响应反混淆
   /// SDK 会自动检测响应是否包含此前缀，有则反混淆，无则直接解析
@@ -278,17 +285,68 @@ extension ConfigFileLoaderHelper on ConfigFileLoader {
     try {
       final security = await getSecurityConfig();
       final prefix = security['obfuscation_prefix'];
-      
+
       // 如果配置为空字符串或 null，返回 null
       if (prefix == null || (prefix is String && prefix.isEmpty)) {
         return null;
       }
-      
+
       return prefix as String;
     } catch (e) {
       _logger.warning('获取混淆前缀失败: $e');
       return null;
     }
   }
-}
 
+  /// 获取强制直连域名列表
+  ///
+  /// 从 xboard.config.yaml 的 `network.force_direct_domains` 读取。
+  /// 支持格式：
+  /// - 列表：['yamatu.xyz', 'panel.example.com']
+  /// - 字符串：'yamatu.xyz,panel.example.com'
+  static Future<List<String>> getForceDirectDomains() async {
+    try {
+      final config = await ConfigFileLoader.loadExtendedConfig();
+      final network = config['network'] as Map<String, dynamic>? ?? {};
+      final raw = network['force_direct_domains'];
+
+      if (raw == null) {
+        _cachedForceDirectDomains = const [];
+        return const [];
+      }
+
+      if (raw is List) {
+        final domains = raw
+            .whereType<Object>()
+            .map((item) => item.toString())
+            .where((item) => item.trim().isNotEmpty)
+            .toList();
+        final normalized = DirectDomainMatcher.normalizeDomainList(domains);
+        _cachedForceDirectDomains = normalized;
+        return normalized;
+      }
+
+      if (raw is String) {
+        final domains = raw
+            .split(',')
+            .map((item) => item.trim())
+            .where((item) => item.isNotEmpty)
+            .toList();
+        final normalized = DirectDomainMatcher.normalizeDomainList(domains);
+        _cachedForceDirectDomains = normalized;
+        return normalized;
+      }
+
+      _cachedForceDirectDomains = const [];
+      return const [];
+    } catch (e) {
+      _logger.warning('获取强制直连域名失败: $e');
+      _cachedForceDirectDomains = const [];
+      return const [];
+    }
+  }
+
+  static List<String> getCachedForceDirectDomains() {
+    return List<String>.from(_cachedForceDirectDomains);
+  }
+}

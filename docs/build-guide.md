@@ -164,6 +164,27 @@ dart setup.dart windows --arch arm64   # ARM64 架构
 
 **构建输出：** `build/windows/runner/Release/xboard_mihomo.exe`
 
+#### ⚠️ CMakeCache 路径冲突（移动项目目录后常见）
+
+如果你把项目从一个路径移动/复制到另一个路径（例如从 `Desktop/123` 改到 `Desktop/flcash`），可能会遇到：
+
+- `CMakeCache.txt directory ... is different than the directory ... where CMakeCache.txt was created`
+- `CMakeLists.txt does not match the source ... used to generate cache`
+
+解决方法：清理 Windows 构建缓存后重新构建即可：
+
+```bash
+flutter clean
+# 或者直接删除 build/windows 目录（尤其是 build/windows/x64）
+```
+
+#### 💡 关于 `FlClashHelperService.exe`（系统代理/管理员权限相关）
+
+- `FlClashHelperService.exe` 是 **Windows 服务程序**，用于在需要管理员权限时辅助启动核心。
+- 在命令行直接运行它可能会出现 **错误码 1063**（“服务进程无法连接到服务控制器上”），这是预期行为：该程序应由 Windows 服务控制管理器（SCM）启动。
+- 正常情况下不需要手动操作：应用会在需要时通过 `sc create/start` 自动注册并启动服务。
+- 如需调试，可使用：`FlClashHelperService.exe --console`（控制台模式运行）。
+
 ---
 
 ### 🍎 macOS 构建

@@ -1,6 +1,6 @@
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
-// import 'package:fl_clash/views/views.dart';
+import 'package:fl_clash/views/tools.dart';
 import 'package:fl_clash/xboard/features/payment/pages/plans.dart';
 import 'package:fl_clash/xboard/features/subscription/pages/xboard_home_page.dart';
 import 'package:fl_clash/xboard/features/online_support/pages/online_support_page.dart';
@@ -18,16 +18,6 @@ class Navigation {
     bool hasProxies = false,
   }) {
     return [
-      // 暂时隐藏其他页面，只保留指定的几个页面
-      // const NavigationItem(
-      //   keep: false,
-      //   icon: Icon(Icons.space_dashboard),
-      //   label: PageLabel.dashboard,
-      //   view: DashboardView(
-      //     key: GlobalObjectKey(PageLabel.dashboard),
-      //   ),
-      //   modes: [], // 暂时隐藏
-      // ),
       const NavigationItem(
         icon: Icon(Icons.home),
         label: PageLabel.xboard,
@@ -67,6 +57,17 @@ class Navigation {
           ),
         ),
         modes: [NavigationItemMode.desktop, NavigationItemMode.mobile], // 桌面端和手机端都显示
+      ),
+      // 系统工具 / 基础配置页面（包含端口设置等）
+      const NavigationItem(
+        icon: Icon(Icons.tune),
+        label: PageLabel.tools,
+        view: ToolsView(
+          key: GlobalObjectKey(
+            PageLabel.tools,
+          ),
+        ),
+        modes: [NavigationItemMode.desktop, NavigationItemMode.mobile],
       ),
       // TODO: 个人中心页面占位 - 待开发
       // const NavigationItem(

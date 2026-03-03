@@ -65,9 +65,8 @@ include(flutter/generated_plugins.cmake)
 set(BUILD_BUNDLE_DIR "$<TARGET_FILE_DIR:${BINARY_NAME}>")
 # Make the "install" step default, as it's required to run.
 set(CMAKE_VS_INCLUDE_INSTALL_TO_DEFAULT_BUILD 1)
-if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  set(CMAKE_INSTALL_PREFIX "${BUILD_BUNDLE_DIR}" CACHE PATH "..." FORCE)
-endif()
+# 始终将安装目录设置为可执行文件所在目录，避免写入 C:\Program Files 造成权限问题
+set(CMAKE_INSTALL_PREFIX "${BUILD_BUNDLE_DIR}" CACHE PATH "..." FORCE)
 
 set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/data")
 set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}")
@@ -81,23 +80,33 @@ install(FILES "${FLUTTER_ICU_DATA_FILE}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}
 install(FILES "${FLUTTER_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
   COMPONENT Runtime)
 
-# libclash.so
+# libclash Windows 相关可执行文件（可选）
 set(CLASH_DIR "../libclash/windows")
 
-# if(CMAKE_SYSTEM_PROCESSOR STREQUAL "ARM64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-# elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "ARM" OR CMAKE_SYSTEM_PROCESSOR MATCHES "armv[0-9]+")
-# elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86")
-#   set(CLASH_DIR "../libclash/windows/x86")
-# endif()
+# 可选安装：仅在文件存在时才安装，避免缺失文件导致整个构建失败
+set(CLASH_CORE_EXE "${CLASH_DIR}/FlClashCore.exe")
+if(EXISTS "${CLASH_CORE_EXE}")
+  install(PROGRAMS "${CLASH_CORE_EXE}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+    COMPONENT Runtime)
+else()
+  message(WARNING "FlClashCore.exe not found in ${CLASH_DIR}, skip installing Windows core binary.")
+endif()
 
-install(PROGRAMS "${CLASH_DIR}/FlClashCore.exe" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
-  COMPONENT Runtime)
+set(CLASH_HELPER_EXE "${CLASH_DIR}/FlClashHelperService.exe")
+if(EXISTS "${CLASH_HELPER_EXE}")
+  install(PROGRAMS "${CLASH_HELPER_EXE}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+    COMPONENT Runtime)
+else()
+  message(WARNING "FlClashHelperService.exe not found in ${CLASH_DIR}, skip installing helper service.")
+endif()
 
-install(PROGRAMS "${CLASH_DIR}/FlClashHelperService.exe" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
-  COMPONENT Runtime)
-
-install(FILES "EnableLoopback.exe" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
-  COMPONENT Runtime)
+set(ENABLE_LOOPBACK_EXE "EnableLoopback.exe")
+if(EXISTS "${ENABLE_LOOPBACK_EXE}")
+  install(FILES "${ENABLE_LOOPBACK_EXE}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+    COMPONENT Runtime)
+else()
+  message(WARNING "EnableLoopback.exe not found, skip installing loopback tool.")
+endif()
 
 if(PLUGIN_BUNDLED_LIBRARIES)
   install(FILES "${PLUGIN_BUNDLED_LIBRARIES}"

@@ -146,25 +146,186 @@ class Build {
 
   static String get distPath => join(current, "dist");
 
-  static String _getCc(BuildItem buildItem) {
+  static String? _firstNonEmptyEnv(
+    Map<String, String> environment,
+    List<String> keys,
+  ) {
+    for (final key in keys) {
+      final value = environment[key];
+      if (value != null && value.trim().isNotEmpty) {
+        return value.trim();
+      }
+    }
+    return null;
+  }
+
+  static int _compareVersionLike(String a, String b) {
+    // 版本目录通常类似：29.0.14206865
+    // 这里做一个“尽力而为”的数字比较，解析失败就回退到字符串比较。
+    final aParts = a.split('.').map((e) => int.tryParse(e)).toList();
+    final bParts = b.split('.').map((e) => int.tryParse(e)).toList();
+    if (aParts.any((e) => e == null) || bParts.any((e) => e == null)) {
+      return a.compareTo(b);
+    }
+    final len = aParts.length > bParts.length ? aParts.length : bParts.length;
+    for (var i = 0; i < len; i++) {
+      final av = i < aParts.length ? aParts[i]! : 0;
+      final bv = i < bParts.length ? bParts[i]! : 0;
+      if (av != bv) return av.compareTo(bv);
+    }
+    return 0;
+  }
+
+  static String? _tryResolveNdkFromSdkRoot(String sdkRoot) {
+    final ndkRootDir = Directory(join(sdkRoot, "ndk"));
+    if (!ndkRootDir.existsSync()) return null;
+
+    final ndkCandidates = ndkRootDir
+        .listSync()
+        .whereType<Directory>()
+        .toList()
+      ..sort((a, b) {
+        final aName = basename(a.path);
+        final bName = basename(b.path);
+        // 版本号越大越新，排序时把“新”放前面
+        return _compareVersionLike(bName, aName);
+      });
+
+    if (ndkCandidates.isEmpty) return null;
+    return ndkCandidates.first.path;
+  }
+
+  static String? _resolveAndroidNdkPath(Map<String, String> environment) {
+    // 优先从常见 NDK 变量读取（兼容不同脚本/CI）
+    final ndk = _firstNonEmptyEnv(environment, [
+      "ANDROID_NDK",
+      "ANDROID_NDK_HOME",
+      "ANDROID_NDK_ROOT",
+      "ANDROID_NDK_PATH",
+      "NDK_HOME",
+      "NDK_ROOT",
+    ]);
+    if (ndk != null) return ndk;
+
+    // 其次尝试从 SDK 根目录推导
+    final sdkRoot = _firstNonEmptyEnv(environment, [
+      "ANDROID_SDK_ROOT",
+      "ANDROID_HOME",
+    ]);
+    if (sdkRoot == null) return null;
+
+    return _tryResolveNdkFromSdkRoot(sdkRoot);
+  }
+
+  static Directory _selectNdkPrebuiltDir(
+    Directory prebuiltRootDir,
+    Map<String, String> environment,
+  ) {
+    if (!prebuiltRootDir.existsSync()) {
+      throw "未找到 NDK prebuilt 目录: ${prebuiltRootDir.path}";
+    }
+
+    final candidates = prebuiltRootDir.listSync().whereType<Directory>().toList();
+    if (candidates.isEmpty) {
+      throw "NDK prebuilt 目录为空: ${prebuiltRootDir.path}";
+    }
+
+    final osKeyword = Platform.isWindows
+        ? "windows"
+        : Platform.isMacOS
+            ? "darwin"
+            : Platform.isLinux
+                ? "linux"
+                : "";
+
+    // 先按 OS 过滤，再按主机架构尽量匹配
+    final osMatched = osKeyword.isEmpty
+        ? candidates
+        : candidates
+            .where((d) => basename(d.path).toLowerCase().contains(osKeyword))
+            .toList();
+
+    final pool = osMatched.isEmpty ? candidates : osMatched;
+
+    if (Platform.isWindows) {
+      final arch = (environment["PROCESSOR_ARCHITECTURE"] ?? "").toLowerCase();
+      final preferArm64 = arch.contains("arm64") || arch.contains("aarch64");
+      final dir = pool.firstWhere(
+        (d) {
+          final name = basename(d.path).toLowerCase();
+          if (preferArm64) {
+            return name.contains("arm64") || name.contains("aarch64");
+          }
+          return name.contains("x86_64") || name.contains("x64");
+        },
+        orElse: () => pool.first,
+      );
+      return dir;
+    }
+
+    return pool.first;
+  }
+
+  static String _getCc(
+    BuildItem buildItem, {
+    String? androidNdkPath,
+  }) {
     final environment = Platform.environment;
     if (buildItem.target == Target.android) {
-      final ndk = environment["ANDROID_NDK"];
-      assert(ndk != null);
-      final prebuiltDir =
-          Directory(join(ndk!, "toolchains", "llvm", "prebuilt"));
-      final prebuiltDirList = prebuiltDir.listSync();
+      final ndk = (androidNdkPath != null && androidNdkPath.trim().isNotEmpty)
+          ? androidNdkPath.trim()
+          : _resolveAndroidNdkPath(environment);
+
+      if (ndk == null) {
+        // 重点：Windows 下 setx 不会影响当前终端进程，很多人会在同一个 CMD 里直接跑，导致这里读不到环境变量。
+        throw [
+          "未检测到 Android NDK 路径（需要设置 ANDROID_NDK/ANDROID_NDK_ROOT 等环境变量，或传入 --ndk 参数）。",
+          "注意：Windows 的 setx 不会影响当前终端，请重新打开终端，或在当前终端执行：",
+          "  CMD:  set ANDROID_NDK=C:\\\\Users\\\\...\\\\Android\\\\Sdk\\\\ndk\\\\29.0.14206865",
+          "  PowerShell:  \$env:ANDROID_NDK=\"C:\\\\Users\\\\...\\\\Android\\\\Sdk\\\\ndk\\\\29.0.14206865\"",
+          "或者直接执行：",
+          "  dart setup.dart android --ndk=\"C:\\\\Users\\\\...\\\\Android\\\\Sdk\\\\ndk\\\\29.0.14206865\"",
+        ].join("\n");
+      }
+
+      final prebuiltRootDir =
+          Directory(join(ndk, "toolchains", "llvm", "prebuilt"));
+      final prebuiltDir = _selectNdkPrebuiltDir(prebuiltRootDir, environment);
+
       final map = {
         "armeabi-v7a": "armv7a-linux-androideabi21-clang",
         "arm64-v8a": "aarch64-linux-android21-clang",
         "x86": "i686-linux-android21-clang",
         "x86_64": "x86_64-linux-android21-clang"
       };
-      return join(
-        prebuiltDirList.first.path,
-        "bin",
-        map[buildItem.archName],
-      );
+
+      final ccName = map[buildItem.archName];
+      if (ccName == null || ccName.isEmpty) {
+        throw "未知的 Android ABI: ${buildItem.archName}（无法选择 clang）";
+      }
+
+      final baseCcPath = join(prebuiltDir.path, "bin", ccName);
+      final candidates = Platform.isWindows
+          ? [
+              "$baseCcPath.cmd",
+              "$baseCcPath.exe",
+              baseCcPath,
+            ]
+          : [
+              baseCcPath,
+            ];
+
+      for (final ccPath in candidates) {
+        if (File(ccPath).existsSync()) {
+          return ccPath;
+        }
+      }
+
+      throw [
+        "未找到 NDK clang 编译器：$baseCcPath",
+        "已尝试：${candidates.join(", ")}",
+        "请确认 NDK 安装完整，且路径指向正确的 NDK 根目录。",
+      ].join("\n");
     }
     return "gcc";
   }
@@ -219,6 +380,7 @@ class Build {
     required Mode mode,
     required Target target,
     Arch? arch,
+    String? androidNdkPath,
   }) async {
     final isLib = mode == Mode.lib;
 
@@ -232,16 +394,29 @@ class Build {
     final List<String> corePaths = [];
 
     for (final item in items) {
-      final outFileDir = join(
-        outDir,
-        item.target.name,
-        item.archName,
-      );
+      // lib 模式(目前用于 Android 动态库)按架构分目录:
+      //   libclash/android/<archName>/libclash.so
+      // core 模式(桌面 / helper 核心)按系统分目录:
+      //   libclash/windows/FlClashCore.exe
+      //   libclash/linux/FlClashCore
+      //   libclash/macos/FlClashCore
+      final String outFileDir = isLib
+          ? join(
+              outDir,
+              item.target.name,
+              item.archName ?? item.arch!.name,
+            )
+          : join(
+              outDir,
+              item.target.name,
+            );
 
-      final file = File(outFileDir);
-      if (file.existsSync()) {
-        file.deleteSync(recursive: true);
+      // 确保输出目录存在, 若已有旧目录则先清理
+      final outDirEntity = Directory(outFileDir);
+      if (outDirEntity.existsSync()) {
+        outDirEntity.deleteSync(recursive: true);
       }
+      outDirEntity.createSync(recursive: true);
 
       final fileName = isLib
           ? "$libName${item.target.dynamicLibExtensionName}"
@@ -259,7 +434,7 @@ class Build {
       }
       if (isLib) {
         env["CGO_ENABLED"] = "1";
-        env["CC"] = _getCc(item);
+        env["CC"] = _getCc(item, androidNdkPath: androidNdkPath);
         env["CFLAGS"] = "-O3 -Werror";
       } else {
         env["CGO_ENABLED"] = "0";
@@ -396,6 +571,13 @@ class BuildCommand extends Command {
       ].join(','),
       help: 'The $name build env',
     );
+
+    if (target == Target.android) {
+      argParser.addOption(
+        "ndk",
+        help: 'Android NDK 路径（优先级最高），例如 C:\\\\Android\\\\Sdk\\\\ndk\\\\29.0.14206865',
+      );
+    }
   }
 
   @override
@@ -487,8 +669,27 @@ class BuildCommand extends Command {
   Future<void> run() async {
     final mode = target == Target.android ? Mode.lib : Mode.core;
     final String out = argResults?["out"] ?? (target.same ? "app" : "core");
-    final archName = argResults?["arch"];
+    String? archName = argResults?["arch"];
     final env = argResults?["env"] ?? "stable";
+    // 注意：Dart 不支持 `obj?["key"]` 这种“空安全索引”语法，
+    // 这里需要显式判空，避免被解析为三元表达式导致语法错误。
+    final results = argResults;
+    final androidNdkPath = target == Target.android
+        ? (results == null ? null : results["ndk"] as String?)
+        : null;
+
+    // 如果未显式指定架构, 尝试根据当前系统自动推断
+    if (archName == null && target != Target.android && target.same) {
+      final sysArch = (await systemArch)?.toLowerCase();
+      if (sysArch != null) {
+        // 桌面端只区分 arm64 / amd64
+        archName = (sysArch.contains('arm64') || sysArch.contains('aarch64'))
+            ? Arch.arm64.name
+            : Arch.amd64.name;
+        print('Auto detect arch: $archName (system: $sysArch)');
+      }
+    }
+
     final currentArches =
         arches.where((element) => element.name == archName).toList();
     final arch = currentArches.isEmpty ? null : currentArches.first;
@@ -501,6 +702,7 @@ class BuildCommand extends Command {
       target: target,
       arch: arch,
       mode: mode,
+      androidNdkPath: androidNdkPath,
     );
 
     if (out != "app") {

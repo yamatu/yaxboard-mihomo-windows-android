@@ -133,6 +133,57 @@ class SimpleHttpClient implements IHttpClient {
   }
 }
 
+/// 规范化远程返回的 JSON 字符串
+///
+/// - 支持移除以 `//` 开头的整行注释
+/// - 支持移除行尾的注释（形如 ` ... // comment`）
+/// - 如果意外拼接了多个 JSON 对象，只保留第一个完整对象
+String _normalizeJson(String raw) {
+  // 去掉前后空白
+  var cleaned = raw.trim();
+
+  // 移除整行注释
+  cleaned = cleaned.replaceAll(
+    RegExp(r'^\s*//.*$', multiLine: true),
+    '',
+  );
+
+  // 移除行尾注释（以空白后紧跟 // 作为注释起点，避免误伤 https://）
+  cleaned = cleaned.replaceAll(
+    RegExp(r'\s+//.*$', multiLine: true),
+    '',
+  );
+
+  cleaned = cleaned.trim();
+
+  // 只保留第一个完整的 {...} JSON 对象，防止文件被意外重复拼接
+  final firstBrace = cleaned.indexOf('{');
+  if (firstBrace == -1) {
+    return cleaned;
+  }
+
+  var level = 0;
+  var endIndex = -1;
+  for (var i = firstBrace; i < cleaned.length; i++) {
+    final ch = cleaned[i];
+    if (ch == '{') {
+      level++;
+    } else if (ch == '}') {
+      level--;
+      if (level == 0) {
+        endIndex = i;
+        break;
+      }
+    }
+  }
+
+  if (endIndex != -1) {
+    cleaned = cleaned.substring(firstBrace, endIndex + 1);
+  }
+
+  return cleaned.trim();
+}
+
 /// 配置源抽象接口
 abstract class ConfigSource {
   String get sourceName;
@@ -170,7 +221,8 @@ class RedirectConfigSource implements ConfigSource {
         return ConfigResult.failure("重定向配置源获取失败", sourceName);
       }
 
-      final jsonData = json.decode(rawData.trim()) as Map<String, dynamic>;
+      final normalized = _normalizeJson(rawData);
+      final jsonData = json.decode(normalized) as Map<String, dynamic>;
       _logger.info('重定向配置源获取成功');
       return ConfigResult.success(jsonData, sourceName);
 
@@ -292,7 +344,8 @@ class RemoteConfigSource {
       
       if (response.statusCode == 200) {
         final responseBody = await response.transform(utf8.decoder).join();
-        final data = json.decode(responseBody) as Map<String, dynamic>;
+        final normalized = _normalizeJson(responseBody);
+        final data = json.decode(normalized) as Map<String, dynamic>;
         
         client.close();
         return ConfigResult.success(data, name);
