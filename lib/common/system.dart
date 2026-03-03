@@ -11,6 +11,9 @@ import 'package:flutter/services.dart';
 class System {
   static System? _instance;
   List<String>? originDns;
+  final Map<String, List<String>> _originDnsByService = {};
+  static const String _networksetupPath = "/usr/sbin/networksetup";
+  static const String _routePath = "/sbin/route";
 
   System._internal();
 
@@ -28,7 +31,7 @@ class System {
       "macos" => (deviceInfo as MacOsDeviceInfo).majorVersion,
       "android" => (deviceInfo as AndroidDeviceInfo).version.sdkInt,
       "windows" => (deviceInfo as WindowsDeviceInfo).majorVersion,
-      String() => 0
+      String() => 0,
     };
   }
 
@@ -94,7 +97,7 @@ class System {
       );
       final arguments = [
         "-c",
-        'echo "$password" | sudo -S chown root:root "$corePath" && echo "$password" | sudo -S chmod +sx "$corePath"'
+        'echo "$password" | sudo -S chown root:root "$corePath" && echo "$password" | sudo -S chmod +sx "$corePath"',
       ];
       final result = await Process.run(shell, arguments);
       if (result.exitCode != 0) {
@@ -109,37 +112,46 @@ class System {
     if (!Platform.isMacOS) {
       return null;
     }
-    final result = await Process.run('route', ['-n', 'get', 'default']);
+    final result = await Process.run(_routePath, ['-n', 'get', 'default']);
+    if (result.exitCode != 0) {
+      return null;
+    }
     final output = result.stdout.toString();
-    final deviceLine = output
-        .split('\n')
-        .firstWhere((s) => s.contains('interface:'), orElse: () => "");
-    final lineSplits = deviceLine.trim().split(' ');
-    if (lineSplits.length != 2) {
+    final deviceMatch = RegExp(
+      r'^\s*interface:\s*(\S+)\s*$',
+      multiLine: true,
+    ).firstMatch(output);
+    final device = deviceMatch?.group(1)?.trim();
+    if (device == null || device.isEmpty) {
       return null;
     }
-    final device = lineSplits[1];
-    final serviceResult = await Process.run(
-      'networksetup',
-      ['-listnetworkserviceorder'],
-    );
-    final serviceResultOutput = serviceResult.stdout.toString();
-    final currentService = serviceResultOutput.split('\n\n').firstWhere(
-          (s) => s.contains("Device: $device"),
-          orElse: () => "",
-        );
-    if (currentService.isEmpty) {
+
+    final serviceResult = await Process.run(_networksetupPath, [
+      '-listnetworkserviceorder',
+    ]);
+    if (serviceResult.exitCode != 0) {
       return null;
     }
-    final currentServiceNameLine = currentService.split("\n").firstWhere(
-        (line) => RegExp(r'^\(\d+\).*').hasMatch(line),
-        orElse: () => "");
-    final currentServiceNameLineSplits =
-        currentServiceNameLine.trim().split(' ');
-    if (currentServiceNameLineSplits.length < 2) {
-      return null;
+    final serviceOrderOutput = serviceResult.stdout.toString();
+    String? currentServiceName;
+    final serviceLinePattern = RegExp(r'^\(\d+\)\s*(.+)$');
+    final devicePattern = RegExp(r'Device:\s*([^,)]+)');
+    for (final line in serviceOrderOutput.split('\n')) {
+      final serviceMatch = serviceLinePattern.firstMatch(line.trim());
+      if (serviceMatch != null) {
+        currentServiceName = serviceMatch.group(1)?.trim();
+        continue;
+      }
+      final lineDeviceMatch = devicePattern.firstMatch(line);
+      if (lineDeviceMatch == null) {
+        continue;
+      }
+      final lineDevice = lineDeviceMatch.group(1)?.trim();
+      if (lineDevice == device && currentServiceName != null) {
+        return currentServiceName;
+      }
     }
-    return currentServiceNameLineSplits[1];
+    return null;
   }
 
   Future<List<String>?> getMacOSOriginDns() async {
@@ -150,16 +162,12 @@ class System {
     if (deviceServiceName == null) {
       return null;
     }
-    final result = await Process.run(
-      'networksetup',
-      ['-getdnsservers', deviceServiceName],
-    );
-    final output = result.stdout.toString().trim();
-    if (output.startsWith("There aren't any DNS Servers set on")) {
-      originDns = [];
-    } else {
-      originDns = output.split("\n");
+    final dns = await _getMacOSDnsByService(deviceServiceName);
+    if (dns == null) {
+      return null;
     }
+    originDns = List<String>.from(dns);
+    _originDnsByService[deviceServiceName] = List<String>.from(dns);
     return originDns;
   }
 
@@ -167,36 +175,111 @@ class System {
     if (!Platform.isMacOS) {
       return;
     }
-    final serviceName = await getMacOSDefaultServiceName();
-    if (serviceName == null) {
+    final services = await _getMacOSTargetServiceNames();
+    if (services.isEmpty) {
       return;
     }
-    List<String>? nextDns;
-    if (restore) {
-      nextDns = originDns;
-    } else {
-      final originDns = await system.getMacOSOriginDns();
-      if (originDns == null) {
-        return;
+
+    const needAddDns = "223.5.5.5";
+    for (final serviceName in services) {
+      List<String>? nextDns;
+      if (restore) {
+        nextDns = _originDnsByService[serviceName];
+        if (nextDns == null && services.length == 1 && originDns != null) {
+          nextDns = List<String>.from(originDns!);
+        }
+      } else {
+        final currentDns = await _getMacOSDnsByService(serviceName);
+        if (currentDns == null) {
+          continue;
+        }
+        _originDnsByService[serviceName] = List<String>.from(currentDns);
+        if (services.length == 1) {
+          originDns = List<String>.from(currentDns);
+        }
+        if (currentDns.contains(needAddDns)) {
+          continue;
+        }
+        nextDns = List<String>.from(currentDns)..add(needAddDns);
       }
-      final needAddDns = "223.5.5.5";
-      if (originDns.contains(needAddDns)) {
-        return;
+      if (nextDns == null) {
+        continue;
       }
-      nextDns = List.from(originDns)..add(needAddDns);
-    }
-    if (nextDns == null) {
-      return;
-    }
-    await Process.run(
-      'networksetup',
-      [
+
+      await _runNetworksetupWithElevationFallback([
         '-setdnsservers',
         serviceName,
         if (nextDns.isNotEmpty) ...nextDns,
         if (nextDns.isEmpty) "Empty",
-      ],
-    );
+      ]);
+    }
+  }
+
+  Future<List<String>> _getMacOSTargetServiceNames() async {
+    final serviceName = await getMacOSDefaultServiceName();
+    if (serviceName != null) {
+      return [serviceName];
+    }
+    final result = await _runNetworksetup(['-listallnetworkservices']);
+    if (result.exitCode != 0) {
+      return const [];
+    }
+    return result.stdout
+        .toString()
+        .split("\n")
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .where((line) => !line.startsWith("An asterisk"))
+        .where((line) => !line.startsWith("*"))
+        .toList(growable: false);
+  }
+
+  Future<List<String>?> _getMacOSDnsByService(String serviceName) async {
+    final result = await _runNetworksetup(['-getdnsservers', serviceName]);
+    if (result.exitCode != 0) {
+      return null;
+    }
+    final output = result.stdout.toString().trim();
+    if (output.startsWith("There aren't any DNS Servers set on")) {
+      return [];
+    }
+    return output
+        .split("\n")
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  bool _isMacOSPermissionDenied(ProcessResult result) {
+    final combined = "${result.stdout}\n${result.stderr}".toLowerCase();
+    return combined.contains("you must be root") ||
+        combined.contains("must be run as root") ||
+        combined.contains("not authorized") ||
+        combined.contains("permission denied");
+  }
+
+  String _shQuote(String value) => "'${value.replaceAll("'", "'\\''")}'";
+
+  Future<ProcessResult> _runNetworksetup(
+    List<String> args, {
+    bool administratorPrivileges = false,
+  }) async {
+    if (!administratorPrivileges) {
+      return await Process.run(_networksetupPath, args);
+    }
+    final cmd = [_networksetupPath, ...args.map(_shQuote)].join(" ").trim();
+    final script = 'do shell script "$cmd" with administrator privileges';
+    return await Process.run("osascript", ["-e", script]);
+  }
+
+  Future<ProcessResult> _runNetworksetupWithElevationFallback(
+    List<String> args,
+  ) async {
+    final result = await _runNetworksetup(args);
+    if (result.exitCode == 0 || !_isMacOSPermissionDenied(result)) {
+      return result;
+    }
+    return await _runNetworksetup(args, administratorPrivileges: true);
   }
 
   back() async {
