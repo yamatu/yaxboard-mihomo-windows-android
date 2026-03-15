@@ -10,6 +10,7 @@ import 'package:fl_clash/xboard/config/utils/config_file_loader.dart';
 import 'package:fl_clash/xboard/core/core.dart';
 import 'package:fl_clash/xboard/infrastructure/http/user_agent_config.dart';
 import 'package:fl_clash/xboard/infrastructure/network/direct_domain_matcher.dart';
+import 'package:fl_clash/xboard/infrastructure/network/doh_dns_resolver.dart';
 import 'package:socks5_proxy/socks_client.dart';
 
 // 初始化文件级日志器
@@ -276,6 +277,19 @@ class DomainRacingService {
         // 域名 或 IP+端口走代理：使用默认配置
         client = HttpClient();
         _logger.info('[域名竞速] 域名 #$index 使用默认HttpClient [$connectionType]');
+      }
+
+      final enableDohResolver =
+          await ConfigFileLoaderHelper.getEnableDohResolver();
+      final dohResolverUrl = await ConfigFileLoaderHelper.getDohResolverUrl();
+      if (enableDohResolver && !useProxy) {
+        DohDnsResolver.configureHttpClient(
+          client,
+          enabled: true,
+          dohUrl: dohResolverUrl,
+          onBadCertificate: (cert, host, port) => true,
+        );
+        _logger.info('[域名竞速] 域名 #$index 启用 DoH 解析: $dohResolverUrl');
       }
 
       // 如果使用代理，配置 SOCKS5 代理

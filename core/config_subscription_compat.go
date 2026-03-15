@@ -48,6 +48,9 @@ func containsShareScheme(content string) bool {
 	return strings.Contains(content, "vless://") ||
 		strings.Contains(content, "vmess://") ||
 		strings.Contains(content, "trojan://") ||
+		strings.Contains(content, "naive://") ||
+		strings.Contains(content, "naive+https://") ||
+		strings.Contains(content, "naive+quic://") ||
 		strings.Contains(content, "ss://") ||
 		strings.Contains(content, "ssr://") ||
 		strings.Contains(content, "hysteria://") ||

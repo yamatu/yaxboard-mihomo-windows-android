@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:encrypt/encrypt.dart';
 import '../core/config_settings.dart';
 import '../../core/core.dart';
+import '../../infrastructure/network/doh_dns_resolver.dart';
+import '../utils/config_file_loader.dart';
 
 // 初始化文件级日志器
 final _logger = FileLogger('remote_config_manager.dart');
@@ -59,18 +61,18 @@ class ConfigResult<T> {
 class MultiConfigResult {
   /// 重定向配置源结果
   final ConfigResult<Map<String, dynamic>> redirectResult;
-  
+
   /// Gitee配置源结果
   final ConfigResult<Map<String, dynamic>> giteeResult;
-  
+
   const MultiConfigResult({
     required this.redirectResult,
     required this.giteeResult,
   });
-  
+
   /// 是否有任何一个配置源成功
   bool get hasSuccess => redirectResult.isSuccess || giteeResult.isSuccess;
-  
+
   /// 获取第一个成功的配置数据
   Map<String, dynamic>? get firstSuccessfulData {
     if (redirectResult.isSuccess && redirectResult.data != null) {
@@ -81,7 +83,7 @@ class MultiConfigResult {
     }
     return null;
   }
-  
+
   /// 获取第一个成功的配置源名称
   String? get firstSuccessfulSource {
     if (redirectResult.isSuccess) return redirectResult.source;
@@ -95,7 +97,7 @@ class MultiConfigResult {
     if (giteeResult.isSuccess) return giteeResult;
     return null;
   }
-  
+
   @override
   String toString() {
     return 'MultiConfigResult{redirect: ${redirectResult.status}, gitee: ${giteeResult.status}}';
@@ -116,6 +118,16 @@ class SimpleHttpClient implements IHttpClient {
       client = HttpClient();
       client.badCertificateCallback = (cert, host, port) => true;
       client.connectionTimeout = timeout ?? const Duration(seconds: 10);
+
+      // 读取 DoH 配置（使用已缓存的值，避免额外的异步 I/O）
+      final enableDoh = ConfigFileLoaderHelper.getCachedEnableDohResolver();
+      final dohUrl = ConfigFileLoaderHelper.getCachedDohResolverUrl();
+      DohDnsResolver.configureHttpClient(
+        client,
+        enabled: enableDoh,
+        dohUrl: dohUrl,
+        onBadCertificate: (cert, host, port) => true,
+      );
 
       final request = await client.getUrl(Uri.parse(url));
       final response = await request.close();
@@ -201,8 +213,8 @@ class RedirectConfigSource implements ConfigSource {
     IHttpClient? httpClient,
     required this.redirectUrl,
     Duration? timeout,
-  }) : _httpClient = httpClient ?? SimpleHttpClient(),
-       timeout = timeout ?? const Duration(seconds: 10);
+  })  : _httpClient = httpClient ?? SimpleHttpClient(),
+        timeout = timeout ?? const Duration(seconds: 10);
 
   @override
   String get sourceName => 'redirect';
@@ -214,7 +226,8 @@ class RedirectConfigSource implements ConfigSource {
   Future<ConfigResult<Map<String, dynamic>>> fetchConfig() async {
     try {
       _logger.info('开始获取重定向配置源: $redirectUrl');
-      final rawData = await _httpClient.getString(redirectUrl, timeout: timeout);
+      final rawData =
+          await _httpClient.getString(redirectUrl, timeout: timeout);
 
       if (rawData == null || rawData.trim().isEmpty) {
         _logger.error('重定向配置源获取失败: 数据为空');
@@ -225,7 +238,6 @@ class RedirectConfigSource implements ConfigSource {
       final jsonData = json.decode(normalized) as Map<String, dynamic>;
       _logger.info('重定向配置源获取成功');
       return ConfigResult.success(jsonData, sourceName);
-
     } catch (e) {
       _logger.error('重定向配置源异常', e);
       return ConfigResult.failure("重定向配置源异常: ${e.toString()}", sourceName);
@@ -245,8 +257,8 @@ class GiteeConfigSource implements ConfigSource {
     required this.giteeUrl,
     required this.encryptionKeyBase64,
     Duration? timeout,
-  }) : _httpClient = httpClient ?? SimpleHttpClient(),
-       timeout = timeout ?? const Duration(seconds: 10);
+  })  : _httpClient = httpClient ?? SimpleHttpClient(),
+        timeout = timeout ?? const Duration(seconds: 10);
 
   @override
   String get sourceName => 'gitee';
@@ -257,7 +269,8 @@ class GiteeConfigSource implements ConfigSource {
   @override
   Future<ConfigResult<Map<String, dynamic>>> fetchConfig() async {
     try {
-      final encryptedData = await _httpClient.getString(giteeUrl, timeout: timeout);
+      final encryptedData =
+          await _httpClient.getString(giteeUrl, timeout: timeout);
 
       if (encryptedData == null) {
         return ConfigResult.failure("Gitee配置源获取失败", sourceName);
@@ -270,14 +283,14 @@ class GiteeConfigSource implements ConfigSource {
       }
 
       return ConfigResult.success(decryptedConfig, sourceName);
-
     } catch (e) {
       return ConfigResult.failure("Gitee配置源异常: ${e.toString()}", sourceName);
     }
   }
 
   /// 解密配置数据（AES-GCM解密）
-  Future<Map<String, dynamic>?> _decryptConfigData(String encryptedBase64) async {
+  Future<Map<String, dynamic>?> _decryptConfigData(
+      String encryptedBase64) async {
     try {
       final encryptedBytes = base64.decode(encryptedBase64);
       final keyBytes = base64.decode(encryptionKeyBase64);
@@ -330,9 +343,19 @@ class RemoteConfigSource {
       client.badCertificateCallback = (cert, host, port) => true;
       client.connectionTimeout = timeout;
 
+      // 读取 DoH 配置（使用已缓存的值）
+      final enableDoh = ConfigFileLoaderHelper.getCachedEnableDohResolver();
+      final dohUrl = ConfigFileLoaderHelper.getCachedDohResolverUrl();
+      DohDnsResolver.configureHttpClient(
+        client,
+        enabled: enableDoh,
+        dohUrl: dohUrl,
+        onBadCertificate: (cert, host, port) => true,
+      );
+
       final uri = Uri.parse(url);
       final request = await client.getUrl(uri);
-      
+
       // 添加请求头
       if (headers != null) {
         headers!.forEach((key, value) {
@@ -341,12 +364,12 @@ class RemoteConfigSource {
       }
 
       final response = await request.close();
-      
+
       if (response.statusCode == 200) {
         final responseBody = await response.transform(utf8.decoder).join();
         final normalized = _normalizeJson(responseBody);
         final data = json.decode(normalized) as Map<String, dynamic>;
-        
+
         client.close();
         return ConfigResult.success(data, name);
       } else {
@@ -374,15 +397,15 @@ class RemoteConfigManager {
     int maxRetries = 3,
     Duration retryDelay = const Duration(seconds: 2),
     bool enableConcurrentFetch = true,
-  }) : _configSources = sources ?? _createDefaultSources(),
-       _maxRetries = maxRetries,
-       _retryDelay = retryDelay,
-       _enableConcurrentFetch = enableConcurrentFetch;
+  })  : _configSources = sources ?? _createDefaultSources(),
+        _maxRetries = maxRetries,
+        _retryDelay = retryDelay,
+        _enableConcurrentFetch = enableConcurrentFetch;
 
   /// 从配置设置创建RemoteConfigManager
   factory RemoteConfigManager.fromSettings(RemoteConfigSettings settings) {
     final sources = <ConfigSource>[];
-    
+
     for (final sourceConfig in settings.sources) {
       switch (sourceConfig.name) {
         case 'redirect':
@@ -392,7 +415,8 @@ class RemoteConfigManager {
           ));
           break;
         case 'gitee':
-          if (sourceConfig.encryptionKey == null || sourceConfig.encryptionKey!.isEmpty) {
+          if (sourceConfig.encryptionKey == null ||
+              sourceConfig.encryptionKey!.isEmpty) {
             throw Exception('Gitee配置源必须提供 encryptionKey');
           }
           sources.add(GiteeConfigSource(
@@ -403,7 +427,7 @@ class RemoteConfigManager {
           break;
       }
     }
-    
+
     return RemoteConfigManager(
       sources: sources,
       maxRetries: settings.maxRetries,
@@ -438,7 +462,9 @@ class RemoteConfigManager {
     late ConfigResult<Map<String, dynamic>> redirectResult;
     late ConfigResult<Map<String, dynamic>> giteeResult;
 
-    if (_enableConcurrentFetch && redirectSource != null && giteeSource != null) {
+    if (_enableConcurrentFetch &&
+        redirectSource != null &&
+        giteeSource != null) {
       // 并发请求
       final results = await Future.wait([
         _fetchWithRetry(redirectSource),
@@ -486,19 +512,20 @@ class RemoteConfigManager {
   }
 
   /// 从指定配置源获取配置
-  Future<ConfigResult<Map<String, dynamic>>> fetchFromSource(String sourceName) async {
+  Future<ConfigResult<Map<String, dynamic>>> fetchFromSource(
+      String sourceName) async {
     final source = _configSources.firstWhere(
       (s) => s.sourceName == sourceName,
       orElse: () => throw ArgumentError('Unknown source: $sourceName'),
     );
-    
+
     return await _fetchWithRetry(source);
   }
 
   /// 获取第一个可用的配置
   Future<ConfigResult<Map<String, dynamic>>> fetchConfig() async {
     final multiResult = await fetchAllConfigs();
-    
+
     if (multiResult.hasSuccess) {
       return multiResult.firstSuccessful!;
     } else {
@@ -510,22 +537,23 @@ class RemoteConfigManager {
   }
 
   /// 带重试的获取
-  Future<ConfigResult<Map<String, dynamic>>> _fetchWithRetry(ConfigSource source) async {
+  Future<ConfigResult<Map<String, dynamic>>> _fetchWithRetry(
+      ConfigSource source) async {
     ConfigResult<Map<String, dynamic>>? lastResult;
-    
+
     for (int attempt = 0; attempt <= _maxRetries; attempt++) {
       lastResult = await source.fetchConfig();
-      
+
       if (lastResult.isSuccess) {
         return lastResult;
       }
-      
+
       // 如果不是最后一次尝试，等待后重试
       if (attempt < _maxRetries) {
         await Future.delayed(_retryDelay);
       }
     }
-    
+
     return lastResult!;
   }
 
@@ -540,7 +568,8 @@ class RemoteConfigManager {
   }
 
   /// 获取所有配置源名称
-  List<String> get sourceNames => _configSources.map((s) => s.sourceName).toList();
+  List<String> get sourceNames =>
+      _configSources.map((s) => s.sourceName).toList();
 
   /// 获取配置源数量
   int get sourceCount => _configSources.length;

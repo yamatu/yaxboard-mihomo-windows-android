@@ -7,6 +7,7 @@ import 'package:fl_clash/xboard/config/xboard_config.dart';
 import 'package:fl_clash/xboard/core/core.dart';
 import 'package:fl_clash/xboard/infrastructure/http/user_agent_config.dart';
 import 'package:fl_clash/xboard/infrastructure/network/direct_domain_matcher.dart';
+import 'package:fl_clash/xboard/infrastructure/network/doh_dns_resolver.dart';
 import 'package:socks5_proxy/socks_client.dart';
 
 // 初始化文件级日志器
@@ -142,7 +143,8 @@ class SubscriptionDownloader {
     }
 
     final primaryAnalysis = _analyzeSubscriptionContent(primary.content);
-    if (primaryAnalysis.xhttpHintCount > 0) {
+    if (primaryAnalysis.xhttpHintCount > 0 ||
+        primaryAnalysis.naiveHintCount > 0) {
       return primary;
     }
 
@@ -166,11 +168,13 @@ class SubscriptionDownloader {
         'decodedFromBase64=${fallbackAnalysis.decodedFromBase64}, '
         'uriLines=${fallbackAnalysis.uriLineCount}, '
         'xhttpHints=${fallbackAnalysis.xhttpHintCount}, '
+        'naiveHints=${fallbackAnalysis.naiveHintCount}, '
         'realityHints=${fallbackAnalysis.realityHintCount}',
       );
 
-      if (fallbackAnalysis.xhttpHintCount > primaryAnalysis.xhttpHintCount) {
-        _logger.info('[订阅兼容] 检测到更多 xhttp 特征，切换到 v2rayN 订阅结果');
+      if (fallbackAnalysis.xhttpHintCount > primaryAnalysis.xhttpHintCount ||
+          fallbackAnalysis.naiveHintCount > primaryAnalysis.naiveHintCount) {
+        _logger.info('[订阅兼容] 检测到更多 xhttp/naive 特征，切换到 v2rayN 订阅结果');
         final merged = _mergeDownloadResultMetadata(
           preferred: fallback,
           fallback: primary,
@@ -348,6 +352,19 @@ class SubscriptionDownloader {
       client = HttpClient();
       client.connectionTimeout = _downloadTimeout;
       client.badCertificateCallback = (cert, host, port) => true;
+
+      final enableDohResolver =
+          await ConfigFileLoaderHelper.getEnableDohResolver();
+      final dohResolverUrl = await ConfigFileLoaderHelper.getDohResolverUrl();
+      if (enableDohResolver && !useProxy) {
+        DohDnsResolver.configureHttpClient(
+          client,
+          enabled: true,
+          dohUrl: dohResolverUrl,
+          onBadCertificate: (cert, host, port) => true,
+        );
+        _logger.info('[订阅下载] 启用 DoH 解析: $dohResolverUrl');
+      }
 
       // 如果使用代理，配置 SOCKS5 代理
       if (useProxy && proxyUrl != null) {
@@ -529,6 +546,7 @@ class SubscriptionDownloader {
     int vlessCount = 0;
     int vmessCount = 0;
     int trojanCount = 0;
+    int naiveCount = 0;
 
     final previewKinds = <String>[];
 
@@ -547,6 +565,10 @@ class SubscriptionDownloader {
         vmessCount++;
       } else if (lower.startsWith('trojan://')) {
         trojanCount++;
+      } else if (lower.startsWith('naive://') ||
+          lower.startsWith('naive+https://') ||
+          lower.startsWith('naive+quic://')) {
+        naiveCount++;
       }
 
       if (previewKinds.length < _diagPreviewLimit) {
@@ -557,6 +579,12 @@ class SubscriptionDownloader {
     final xhttpHintCount = RegExp(
       r'(type=xhttp|xhttpsettings|httpupgrade|splithttp|v2ray-http-upgrade)',
     ).allMatches(normalizedLower).length;
+
+    final naiveHintCount = naiveCount +
+        RegExp(r'(^\s*-\s*\{[^\n]*type:\s*naive\b|^\s*type:\s*naive\b)',
+                multiLine: true)
+            .allMatches(normalizedLower)
+            .length;
 
     final realityHintCount =
         RegExp(r'(security=reality|realitysettings|pbk=|reality-opts)')
@@ -570,7 +598,9 @@ class SubscriptionDownloader {
       vlessCount: vlessCount,
       vmessCount: vmessCount,
       trojanCount: trojanCount,
+      naiveCount: naiveCount,
       xhttpHintCount: xhttpHintCount,
+      naiveHintCount: naiveHintCount,
       realityHintCount: realityHintCount,
       uriPreviewKinds: previewKinds,
       decodedFromBase64: normalized != content,
@@ -643,8 +673,8 @@ class SubscriptionDownloader {
         'yamlProxies=${analysis.hasYamlProxies}, '
         'providerProxies=${analysis.hasProviderProxies}, '
         'uriLines=${analysis.uriLineCount}, '
-        'vless=${analysis.vlessCount}, vmess=${analysis.vmessCount}, trojan=${analysis.trojanCount}, '
-        'xhttpHints=${analysis.xhttpHintCount}, realityHints=${analysis.realityHintCount}, '
+        'vless=${analysis.vlessCount}, vmess=${analysis.vmessCount}, trojan=${analysis.trojanCount}, naive=${analysis.naiveCount}, '
+        'xhttpHints=${analysis.xhttpHintCount}, naiveHints=${analysis.naiveHintCount}, realityHints=${analysis.realityHintCount}, '
         'uriPreview=${analysis.uriPreviewKinds.join(",")}',
       );
     } catch (e) {
@@ -692,7 +722,9 @@ class _SubscriptionContentAnalysis {
   final int vlessCount;
   final int vmessCount;
   final int trojanCount;
+  final int naiveCount;
   final int xhttpHintCount;
+  final int naiveHintCount;
   final int realityHintCount;
   final List<String> uriPreviewKinds;
   final bool decodedFromBase64;
@@ -706,7 +738,9 @@ class _SubscriptionContentAnalysis {
     required this.vlessCount,
     required this.vmessCount,
     required this.trojanCount,
+    required this.naiveCount,
     required this.xhttpHintCount,
+    required this.naiveHintCount,
     required this.realityHintCount,
     required this.uriPreviewKinds,
     required this.decodedFromBase64,

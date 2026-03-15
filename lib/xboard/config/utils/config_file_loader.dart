@@ -7,6 +7,9 @@ import '../../infrastructure/network/direct_domain_matcher.dart';
 // 初始化文件级日志器
 final _logger = FileLogger('config_file_loader.dart');
 List<String> _cachedForceDirectDomains = const [];
+const String _defaultDohResolverUrl = 'https://dns.alidns.com/resolve';
+String _cachedDohResolverUrl = _defaultDohResolverUrl;
+bool _cachedEnableDohResolver = true;
 
 /// 配置文件加载器
 ///
@@ -224,6 +227,16 @@ extension ConfigFileLoaderHelper on ConfigFileLoader {
     }
   }
 
+  /// 获取网络配置
+  static Future<Map<String, dynamic>> getNetworkConfig() async {
+    try {
+      final config = await ConfigFileLoader.loadExtendedConfig();
+      return config['network'] as Map<String, dynamic>? ?? {};
+    } catch (e) {
+      return {};
+    }
+  }
+
   /// 获取解密密钥
   static Future<String> getDecryptKey() async {
     try {
@@ -348,5 +361,73 @@ extension ConfigFileLoaderHelper on ConfigFileLoader {
 
   static List<String> getCachedForceDirectDomains() {
     return List<String>.from(_cachedForceDirectDomains);
+  }
+
+  /// 获取 DoH 解析服务器地址。
+  ///
+  /// 配置路径：`xboard.network.doh_url`
+  static Future<String> getDohResolverUrl() async {
+    try {
+      final network = await getNetworkConfig();
+      final raw = network['doh_url'];
+
+      if (raw is String && raw.trim().isNotEmpty) {
+        final candidate = raw.trim();
+        final uri = Uri.tryParse(candidate);
+        if (uri != null && uri.hasScheme && uri.host.isNotEmpty) {
+          _cachedDohResolverUrl = candidate;
+          return candidate;
+        }
+      }
+
+      _cachedDohResolverUrl = _defaultDohResolverUrl;
+      return _defaultDohResolverUrl;
+    } catch (e) {
+      _logger.warning('获取 DoH 解析地址失败: $e');
+      _cachedDohResolverUrl = _defaultDohResolverUrl;
+      return _defaultDohResolverUrl;
+    }
+  }
+
+  static String getCachedDohResolverUrl() {
+    return _cachedDohResolverUrl;
+  }
+
+  /// 是否启用应用内 DoH 解析。
+  ///
+  /// 配置路径：`xboard.network.enable_doh_resolver`
+  static Future<bool> getEnableDohResolver() async {
+    try {
+      final network = await getNetworkConfig();
+      final raw = network['enable_doh_resolver'];
+
+      if (raw is bool) {
+        _cachedEnableDohResolver = raw;
+        return raw;
+      }
+
+      if (raw is String) {
+        final normalized = raw.trim().toLowerCase();
+        if (normalized == 'true' || normalized == '1' || normalized == 'yes') {
+          _cachedEnableDohResolver = true;
+          return true;
+        }
+        if (normalized == 'false' || normalized == '0' || normalized == 'no') {
+          _cachedEnableDohResolver = false;
+          return false;
+        }
+      }
+
+      _cachedEnableDohResolver = true;
+      return true;
+    } catch (e) {
+      _logger.warning('获取 DoH 启用状态失败: $e');
+      _cachedEnableDohResolver = true;
+      return true;
+    }
+  }
+
+  static bool getCachedEnableDohResolver() {
+    return _cachedEnableDohResolver;
   }
 }

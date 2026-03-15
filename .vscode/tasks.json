@@ -1,0 +1,64 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Sync WSL to Windows",
+      "type": "shell",
+      "command": "rsync",
+      "args": [
+        "-avz",
+        "--delete",
+        "--exclude",
+        ".vscode/",
+        "--exclude",
+        "node_modules/",
+        "--exclude",
+        "dist/",
+        "--exclude",
+        "*.log",
+        "./",
+        "/mnt/c/Users/98434/Desktop/123/Xboard-Mihomo"
+      ],
+      "problemMatcher": [],
+      "runOptions": {
+        "runOn": "fileSave"
+      }
+    },
+    {
+      "label": "Sync Windows to WSL",
+      "type": "shell",
+      "command": "rsync",
+      "args": [
+        "-avz",
+        "--delete",
+        "--exclude",
+        ".vscode/",
+        "--exclude",
+        "node_modules/",
+        "--exclude",
+        "dist/",
+        "--exclude",
+        "*.log",
+        "/mnt/c/Users/98434/Desktop/123/Xboard-Mihomo",
+        "./"
+      ],
+      "problemMatcher": [],
+      "runOptions": {
+        "runOn": "fileSave"
+      }
+    },
+    {
+      "type": "go",
+      "label": "go: build package",
+      "command": "build",
+      "args": [
+        "${fileDirname}"
+      ],
+      "problemMatcher": [
+        "$go"
+      ],
+      "group": "build",
+      "detail": "cd /root/Xboard-Mihomo; go build ${fileDirname}"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+    "panelType": "xboard", // 支持 "xboard" 或 "v2board"
+    "panels": {
+        "mihomo": [ // "mihomo" 可以是任意名称，但必须与本地 xboard.config.yaml 中的 provider 保持一致
+            {
+                "url": "https://yamatu.xyz:7001",
+                "description": "主面板"
+            }
+        ]
+    },
+    "onlineSupport": [
+        {
+            "url": "https://yamatu.xyz:7001",
+            "description": "在线客服",
+            "apiBaseUrl": "https://yamatu.xyz:7001",
+            "wsBaseUrl": "wss://yamatu.xyz:7001"
+        }
+    ]
+}

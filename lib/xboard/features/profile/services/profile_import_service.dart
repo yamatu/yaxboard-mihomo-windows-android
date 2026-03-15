@@ -414,9 +414,13 @@ class XBoardProfileImportService {
       final hasYamlProxies =
           RegExp(r'^\s*proxies\s*:', multiLine: true).hasMatch(content);
       final uriLines = RegExp(
-        r'^\s*(vless|vmess|trojan|ss|ssr|hysteria2?|tuic)://',
+        r'^\s*(vless|vmess|trojan|ss|ssr|hysteria2?|tuic|naive(?:\+https|\+quic)?)://',
         multiLine: true,
       ).allMatches(content).length;
+      final naiveHints = RegExp(
+        r'(naive://|naive\+https://|naive\+quic://|^\s*-\s*\{[^\n]*type:\s*naive\b|^\s*type:\s*naive\b)',
+        multiLine: true,
+      ).allMatches(lower).length;
       final xhttpHints =
           RegExp(r'(type=xhttp|xhttpsettings|httpupgrade|splithttp)')
               .allMatches(lower)
@@ -428,7 +432,7 @@ class XBoardProfileImportService {
       _logger.info(
         '[诊断] 加密订阅内容统计: '
         'chars=${content.length}, yamlProxies=$hasYamlProxies, '
-        'uriLines=$uriLines, xhttpHints=$xhttpHints, realityHints=$realityHints',
+        'uriLines=$uriLines, xhttpHints=$xhttpHints, naiveHints=$naiveHints, realityHints=$realityHints',
       );
     } catch (e) {
       _logger.warning('[诊断] 加密订阅内容统计失败', e);
