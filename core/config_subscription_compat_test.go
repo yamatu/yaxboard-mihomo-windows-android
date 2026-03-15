@@ -10,6 +10,7 @@ func TestParseRawConfigWithSubscriptionCompat_Base64V2Ray(t *testing.T) {
 	rawLinks := strings.Join([]string{
 		"vless://11111111-1111-1111-1111-111111111111@example.com:443?security=tls&type=xhttp&host=example.com&path=%2Fapi&mode=packet-up#xhttp-1",
 		"vless://22222222-2222-2222-2222-222222222222@example.net:443?security=reality&pbk=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&sid=abcd&type=xhttp&path=%2Fresource#xhttp-2",
+		"naive+https://demo-user:demo-pass@example.org:443?sni=cdn.example.org&insecure=1#naive-1",
 	}, "\n")
 
 	encoded := base64.StdEncoding.EncodeToString([]byte(rawLinks))
@@ -19,8 +20,8 @@ func TestParseRawConfigWithSubscriptionCompat_Base64V2Ray(t *testing.T) {
 		t.Fatalf("parseRawConfigWithSubscriptionCompat returned error: %v", err)
 	}
 
-	if len(rawCfg.Proxy) != 2 {
-		t.Fatalf("expected 2 proxies, got %d", len(rawCfg.Proxy))
+	if len(rawCfg.Proxy) != 3 {
+		t.Fatalf("expected 3 proxies, got %d", len(rawCfg.Proxy))
 	}
 
 	if len(rawCfg.ProxyGroup) == 0 {

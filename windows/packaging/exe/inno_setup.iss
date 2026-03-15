@@ -23,6 +23,10 @@ ArchitecturesAllowed={{ARCH}}
 ArchitecturesInstallIn64BitMode={{ARCH}}
 
 [Code]
+const
+  VCRedistRegistryKey = 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64';
+  VCRedistFileName = 'vc_redist.x64.exe';
+
 procedure KillProcesses;
 var
   Processes: TArrayOfString;
@@ -37,10 +41,63 @@ begin
   end;
 end;
 
+function IsVCRedistInstalled: Boolean;
+var
+  Installed: Cardinal;
+begin
+  Result :=
+    RegQueryDWordValue(HKLM64, VCRedistRegistryKey, 'Installed', Installed) and
+    (Installed = 1);
+end;
+
 function InitializeSetup(): Boolean;
 begin
   KillProcesses;
   Result := True;
+end;
+
+function InstallVCRedist: Boolean;
+var
+  ResultCode: Integer;
+begin
+  Result := True;
+
+  if IsVCRedistInstalled then
+    exit;
+
+  ExtractTemporaryFile(VCRedistFileName);
+  if not Exec(
+    ExpandConstant('{tmp}\' + VCRedistFileName),
+    '/install /quiet /norestart',
+    '',
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode
+  ) then
+  begin
+    SuppressibleMsgBox('Visual C++ 2015-2022 Redistributable x64 安装失败，程序将终止安装。', mbCriticalError, MB_OK, IDOK);
+    Result := False;
+    exit;
+  end;
+
+  if (ResultCode <> 0) and (ResultCode <> 1638) and (ResultCode <> 3010) then
+  begin
+    SuppressibleMsgBox(
+      Format('Visual C++ 2015-2022 Redistributable x64 安装失败，错误代码: %d。', [ResultCode]),
+      mbCriticalError,
+      MB_OK,
+      IDOK
+    );
+    Result := False;
+  end;
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  Result := '';
+
+  if not InstallVCRedist then
+    Result := 'Visual C++ 2015-2022 Redistributable x64 安装失败。';
 end;
 
 [Languages]
@@ -79,6 +136,7 @@ Name: "chineseSimplified"; MessagesFile: {% if locale.file %}{{ locale.file }}{%
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 [Files]
 Source: "{{SOURCE_DIR}}\\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall dontcopy
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]

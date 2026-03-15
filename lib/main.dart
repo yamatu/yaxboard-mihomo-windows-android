@@ -99,6 +99,11 @@ Future<void> _initializeXBoardServices() async {
     await _loadSecurityConfig();
     print('[Main] 安全配置加载成功');
 
+    // 2.5 预热 DoH 配置缓存，确保后续 SimpleHttpClient 能读到正确的 DoH 设置
+    await ConfigFileLoaderHelper.getDohResolverUrl();
+    await ConfigFileLoaderHelper.getEnableDohResolver();
+    print('[Main] DoH 配置缓存预热完成');
+
     // 3. 初始化配置模块
     await XBoardConfig.initialize(settings: configSettings);
     print('[Main] XBoard配置模块初始化成功');

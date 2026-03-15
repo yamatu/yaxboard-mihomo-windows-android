@@ -65,3 +65,6 @@ assets/config/xboard.config.yaml
 
 # 忽略证书文件
 assets/cer/
+
+# Windows packaging cache
+/windows/packaging/exe/vc_redist.x64.exe

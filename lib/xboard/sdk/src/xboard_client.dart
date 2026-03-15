@@ -280,12 +280,17 @@ class XBoardClient {
           await ConfigFileLoaderHelper.getObfuscationPrefix();
       final forceDirectDomains =
           await ConfigFileLoaderHelper.getForceDirectDomains();
+      final enableDohResolver =
+          await ConfigFileLoaderHelper.getEnableDohResolver();
+      final dohResolverUrl = await ConfigFileLoaderHelper.getDohResolverUrl();
 
       // 构建 HttpConfig
       return HttpConfig(
         userAgent: userAgent,
         obfuscationPrefix: obfuscationPrefix,
         forceDirectDomains: forceDirectDomains,
+        enableDohResolver: enableDohResolver,
+        dohResolverUrl: dohResolverUrl,
         enableAutoDeobfuscation: obfuscationPrefix != null,
         enableCertificatePinning: false,
       );
