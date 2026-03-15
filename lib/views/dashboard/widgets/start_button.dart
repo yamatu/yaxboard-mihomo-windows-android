@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/xboard/features/profile/providers/profile_import_provider.dart';
@@ -75,7 +74,7 @@ class _StartButtonState extends ConsumerState<StartButton>
     super.dispose();
   }
 
-  handleSwitchStart() {
+  Future<void> handleSwitchStart() async {
     if (_startupLocked) return;
     if (_isBusy) return;
 
@@ -95,13 +94,18 @@ class _StartButtonState extends ConsumerState<StartButton>
     // If updateStatus fails (profile not ready, etc.), runTime won't change,
     // and the button should stay in the previous state.
     final next = !isStart;
-    debouncer.call(
-      FunctionTag.updateStatus,
-      () {
-        globalState.appController.updateStatus(next);
-      },
-      duration: commonDuration,
-    );
+    final previousState = isStart;
+    try {
+      await globalState.appController.updateStatus(next);
+    } finally {
+      final shouldResetBusy = mounted && isStart == previousState;
+      if (shouldResetBusy) {
+        _busyTimeout?.cancel();
+        setState(() {
+          _isBusy = false;
+        });
+      }
+    }
   }
 
   updateController() {
@@ -181,8 +185,8 @@ class _StartButtonState extends ConsumerState<StartButton>
             clipBehavior: Clip.antiAlias,
             materialTapTargetSize: MaterialTapTargetSize.padded,
             heroTag: null,
-            onPressed: () {
-              handleSwitchStart();
+            onPressed: () async {
+              await handleSwitchStart();
             },
             child: Row(
               mainAxisSize: MainAxisSize.max,

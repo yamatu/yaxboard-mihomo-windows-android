@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/xboard/features/profile/providers/profile_import_provider.dart';
@@ -73,7 +72,7 @@ class _XBoardConnectButtonState extends ConsumerState<XBoardConnectButton>
     _controller.dispose();
     super.dispose();
   }
-  handleSwitchStart() {
+  Future<void> handleSwitchStart() async {
     if (_startupLocked) return;
     if (_isBusy) return;
 
@@ -92,13 +91,18 @@ class _XBoardConnectButtonState extends ConsumerState<XBoardConnectButton>
     // If updateStatus fails (profile not ready, etc.), runTime won't change,
     // and the button should stay in the previous state.
     final next = !isStart;
-    debouncer.call(
-      FunctionTag.updateStatus,
-      () {
-        globalState.appController.updateStatus(next);
-      },
-      duration: commonDuration,
-    );
+    final previousState = isStart;
+    try {
+      await globalState.appController.updateStatus(next);
+    } finally {
+      final shouldResetBusy = mounted && isStart == previousState;
+      if (shouldResetBusy) {
+        _busyTimeout?.cancel();
+        setState(() {
+          _isBusy = false;
+        });
+      }
+    }
   }
   updateController() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -236,8 +240,8 @@ class _XBoardConnectButtonState extends ConsumerState<XBoardConnectButton>
             clipBehavior: Clip.antiAlias,
             materialTapTargetSize: MaterialTapTargetSize.padded,
             heroTag: "xboard_connect_button",
-            onPressed: () {
-              handleSwitchStart();
+            onPressed: () async {
+              await handleSwitchStart();
             },
             icon: _isBusy
                 ? const SizedBox(
@@ -294,8 +298,8 @@ class _XBoardConnectButtonState extends ConsumerState<XBoardConnectButton>
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                onTap: () {
-                  handleSwitchStart();
+                onTap: () async {
+                  await handleSwitchStart();
                 },
                 borderRadius: BorderRadius.circular(12),
                 child: Padding(

@@ -90,6 +90,9 @@ class BuildItem {
 }
 
 class Build {
+  static const String _windowsVCRedistUrl =
+      'https://aka.ms/vs/17/release/vc_redist.x64.exe';
+
   static List<BuildItem> get buildItems => [
         BuildItem(
           target: Target.macos,
@@ -146,6 +149,12 @@ class Build {
 
   static String get distPath => join(current, "dist");
 
+  static String get windowsPackagingPath =>
+      join(current, "windows", "packaging", "exe");
+
+  static String get windowsVCRedistPath =>
+      join(windowsPackagingPath, "vc_redist.x64.exe");
+
   static String? _firstNonEmptyEnv(
     Map<String, String> environment,
     List<String> keys,
@@ -180,10 +189,7 @@ class Build {
     final ndkRootDir = Directory(join(sdkRoot, "ndk"));
     if (!ndkRootDir.existsSync()) return null;
 
-    final ndkCandidates = ndkRootDir
-        .listSync()
-        .whereType<Directory>()
-        .toList()
+    final ndkCandidates = ndkRootDir.listSync().whereType<Directory>().toList()
       ..sort((a, b) {
         final aName = basename(a.path);
         final bName = basename(b.path);
@@ -225,7 +231,8 @@ class Build {
       throw "未找到 NDK prebuilt 目录: ${prebuiltRootDir.path}";
     }
 
-    final candidates = prebuiltRootDir.listSync().whereType<Directory>().toList();
+    final candidates =
+        prebuiltRootDir.listSync().whereType<Directory>().toList();
     if (candidates.isEmpty) {
       throw "NDK prebuilt 目录为空: ${prebuiltRootDir.path}";
     }
@@ -535,6 +542,57 @@ class Build {
       print("Failed to copy file: $e");
     }
   }
+
+  static Future<void> ensureWindowsVCRedist() async {
+    final installerFile = File(windowsVCRedistPath);
+    if (installerFile.existsSync() && installerFile.lengthSync() > 0) {
+      print("use cached vc_redist.x64.exe: ${installerFile.path}");
+      return;
+    }
+
+    installerFile.parent.createSync(recursive: true);
+    final client = HttpClient()..connectionTimeout = const Duration(minutes: 2);
+
+    try {
+      print("download vc_redist.x64.exe");
+      final request = await client.getUrl(Uri.parse(_windowsVCRedistUrl));
+      final response = await request.close();
+
+      if (response.statusCode != HttpStatus.ok) {
+        throw "download vc_redist.x64.exe failed: ${response.statusCode}";
+      }
+
+      final sink = installerFile.openWrite();
+      await response.pipe(sink);
+      await sink.close();
+
+      if (!installerFile.existsSync() || installerFile.lengthSync() == 0) {
+        throw "download vc_redist.x64.exe failed: empty file";
+      }
+    } catch (e) {
+      if (installerFile.existsSync()) {
+        installerFile.deleteSync();
+      }
+      rethrow;
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  static void prepareWindowsPackagingAssets() {
+    final sourceFile = File(windowsVCRedistPath);
+    if (!sourceFile.existsSync()) {
+      throw "vc_redist.x64.exe not found: ${sourceFile.path}";
+    }
+
+    final distDir = Directory(distPath);
+    if (!distDir.existsSync()) {
+      distDir.createSync(recursive: true);
+    }
+
+    final distFile = File(join(distDir.path, 'vc_redist.x64.exe'));
+    sourceFile.copySync(distFile.path);
+  }
 }
 
 class BuildCommand extends Command {
@@ -575,7 +633,8 @@ class BuildCommand extends Command {
     if (target == Target.android) {
       argParser.addOption(
         "ndk",
-        help: 'Android NDK 路径（优先级最高），例如 C:\\\\Android\\\\Sdk\\\\ndk\\\\29.0.14206865',
+        help:
+            'Android NDK 路径（优先级最高），例如 C:\\\\Android\\\\Sdk\\\\ndk\\\\29.0.14206865',
       );
     }
   }
@@ -655,6 +714,153 @@ class BuildCommand extends Command {
     );
   }
 
+  String _formatTimestamp(DateTime now) {
+    String twoDigits(int value) => value.toString().padLeft(2, '0');
+    return '${now.year}${twoDigits(now.month)}${twoDigits(now.day)}-${twoDigits(now.hour)}${twoDigits(now.minute)}${twoDigits(now.second)}';
+  }
+
+  String? _findLatestWindowsIssScript() {
+    final distDir = Directory(Build.distPath);
+    if (!distDir.existsSync()) {
+      return null;
+    }
+
+    final scripts = distDir.listSync().whereType<File>().where((file) {
+      final fileName = basename(file.path).toLowerCase();
+      return fileName.endsWith('.iss') && fileName.contains('setup_exe');
+    }).toList()
+      ..sort((a, b) {
+        final am = a.statSync().modified;
+        final bm = b.statSync().modified;
+        return bm.compareTo(am);
+      });
+
+    if (scripts.isEmpty) {
+      return null;
+    }
+    return scripts.first.path;
+  }
+
+  String? _findLatestWindowsSetupInstaller() {
+    final distDir = Directory(Build.distPath);
+    if (!distDir.existsSync()) {
+      return null;
+    }
+
+    final installers = distDir.listSync().whereType<File>().where((file) {
+      final fileName = basename(file.path).toLowerCase();
+      return fileName.endsWith('-setup.exe') &&
+          !fileName.contains('-setup-fixed');
+    }).toList()
+      ..sort((a, b) {
+        final am = a.statSync().modified;
+        final bm = b.statSync().modified;
+        return bm.compareTo(am);
+      });
+
+    if (installers.isEmpty) {
+      return null;
+    }
+    return installers.first.path;
+  }
+
+  String _createWindowsInstallerAlias(String installerPath) {
+    final installerBaseName = basenameWithoutExtension(installerPath);
+    final aliasBaseName = installerBaseName.endsWith('-setup')
+        ? '$installerBaseName-fixed-latest'
+        : '$installerBaseName-latest';
+    final aliasPath = join(Build.distPath, '$aliasBaseName.exe');
+    File(installerPath).copySync(aliasPath);
+    return aliasPath;
+  }
+
+  String _resolveIsccExecutable() {
+    if (!Platform.isWindows) {
+      return 'ISCC';
+    }
+
+    final candidates = <String>[
+      r'C:\Program Files (x86)\Inno Setup 6\ISCC.exe',
+      r'C:\Program Files\Inno Setup 6\ISCC.exe',
+      'ISCC.exe',
+    ];
+
+    for (final candidate in candidates) {
+      if (candidate.toLowerCase().endsWith('.exe')) {
+        if (File(candidate).existsSync()) {
+          return candidate;
+        }
+        continue;
+      }
+      return candidate;
+    }
+
+    return 'ISCC.exe';
+  }
+
+  Future<void> _buildWindowsInstallerFallback({
+    required String archName,
+  }) async {
+    final issScriptPath = _findLatestWindowsIssScript();
+    if (issScriptPath == null) {
+      throw 'Windows 打包失败，且未找到可用于回退编译的 .iss 脚本（dist/*setup_exe.iss）。';
+    }
+
+    final timestamp = _formatTimestamp(DateTime.now());
+    final outDir = join(Build.distPath, 'installer_$timestamp');
+    Directory(outDir).createSync(recursive: true);
+
+    final scriptBaseName = basenameWithoutExtension(issScriptPath);
+    final baseWithoutExe = scriptBaseName.endsWith('_exe')
+        ? scriptBaseName.substring(0, scriptBaseName.length - 4)
+        : scriptBaseName;
+    final outputBaseName = '$baseWithoutExe-fixed-$timestamp-$archName';
+
+    final iscc = _resolveIsccExecutable();
+    await Build.exec(
+      [
+        iscc,
+        '/O$outDir',
+        '/F$outputBaseName',
+        issScriptPath,
+      ],
+      name: 'windows installer fallback',
+    );
+
+    final fallbackInstallerPath = join(outDir, '$outputBaseName.exe');
+    if (!File(fallbackInstallerPath).existsSync()) {
+      throw '回退编译已执行，但未找到安装包: $fallbackInstallerPath';
+    }
+
+    final latestAliasPath = join(
+      Build.distPath,
+      '$baseWithoutExe-fixed-latest.exe',
+    );
+    File(fallbackInstallerPath).copySync(latestAliasPath);
+
+    print('Windows fallback installer: $fallbackInstallerPath');
+    print('Windows fallback installer alias: $latestAliasPath');
+  }
+
+  Future<void> _buildAndroidApkDirect({
+    required List<String> buildTargets,
+    required String env,
+  }) async {
+    final targetPlatforms = buildTargets.join(',');
+    await Build.exec(
+      [
+        'flutter',
+        'build',
+        'apk',
+        '--target-platform',
+        targetPlatforms,
+        '--split-per-abi',
+        '--dart-define=APP_ENV=$env',
+      ],
+      name: 'android flutter build apk',
+    );
+  }
+
   Future<String?> get systemArch async {
     if (Platform.isWindows) {
       return Platform.environment["PROCESSOR_ARCHITECTURE"];
@@ -714,15 +920,42 @@ class BuildCommand extends Command {
         final token = target != Target.android
             ? await Build.calcSha256(corePaths.first)
             : null;
-        Build.buildHelper(target, token!);
-        _buildDistributor(
-          target: target,
-          targets: "exe,zip",
-          args:
-              " --description $archName --build-dart-define=CORE_SHA256=$token",
-          env: env,
-        );
-        return;
+        await Build.buildHelper(target, token!);
+        await Build.ensureWindowsVCRedist();
+        Build.prepareWindowsPackagingAssets();
+
+        final windowsArch = archName ?? (arch?.name ?? Arch.amd64.name);
+        try {
+          await _buildDistributor(
+            target: target,
+            targets: "exe,zip",
+            args:
+                " --description $archName --build-dart-define=CORE_SHA256=$token",
+            env: env,
+          );
+        } catch (e) {
+          print('windows distributor package failed: $e');
+        }
+
+        final hasIssScript = _findLatestWindowsIssScript() != null;
+        if (hasIssScript) {
+          await _buildWindowsInstallerFallback(
+            archName: windowsArch,
+          );
+          return;
+        }
+
+        {
+          final installerPath = _findLatestWindowsSetupInstaller();
+          if (installerPath != null) {
+            final aliasPath = _createWindowsInstallerAlias(installerPath);
+            print('Windows distributor installer: $installerPath');
+            print('Windows distributor installer alias: $aliasPath');
+            return;
+          }
+        }
+
+        throw 'Windows 打包失败：未找到 setup_exe.iss，且未找到 setup.exe 产物。';
       case Target.linux:
         final targetMap = {
           Arch.arm64: "linux-arm64",
@@ -735,7 +968,7 @@ class BuildCommand extends Command {
         ].join(",");
         final defaultTarget = targetMap[arch];
         await _getLinuxDependencies(arch!);
-        _buildDistributor(
+        await _buildDistributor(
           target: target,
           targets: targets,
           args:
@@ -754,17 +987,15 @@ class BuildCommand extends Command {
             .where((element) => arch == null ? true : element == arch)
             .map((e) => targetMap[e])
             .toList();
-        _buildDistributor(
-          target: target,
-          targets: "apk",
-          args:
-              ",split-per-abi --build-target-platform ${defaultTargets.join(",")}",
+
+        await _buildAndroidApkDirect(
+          buildTargets: defaultTargets.whereType<String>().toList(),
           env: env,
         );
         return;
       case Target.macos:
         await _getMacosDependencies();
-        _buildDistributor(
+        await _buildDistributor(
           target: target,
           targets: "dmg",
           args: " --description $archName",
@@ -781,5 +1012,11 @@ main(args) async {
   runner.addCommand(BuildCommand(target: Target.linux));
   runner.addCommand(BuildCommand(target: Target.windows));
   runner.addCommand(BuildCommand(target: Target.macos));
-  runner.run(args);
+  try {
+    await runner.run(args);
+  } catch (e, st) {
+    print(e);
+    print(st);
+    exitCode = 1;
+  }
 }
