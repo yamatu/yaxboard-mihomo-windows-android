@@ -11,6 +11,7 @@ import 'package:fl_clash/views/application_setting.dart';
 import 'package:fl_clash/views/config/config.dart';
 import 'package:fl_clash/views/hotkey.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -132,7 +133,7 @@ class _LocaleItem extends ConsumerWidget {
     final subTitle = locale ?? appLocalizations.defaultText;
     final currentLocale = utils.getLocaleForString(locale);
     return ListItem<Locale?>.options(
-      leading: const Icon(Icons.language_outlined),
+      leading: const Icon(CupertinoIcons.globe),
       title: Text(appLocalizations.language),
       subtitle: Text(Intl.message(subTitle)),
       delegate: OptionsDelegate(
@@ -156,7 +157,7 @@ class _ThemeItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListItem.open(
-      leading: const Icon(Icons.style),
+      leading: const Icon(CupertinoIcons.paintbrush),
       title: Text(appLocalizations.theme),
       subtitle: Text(appLocalizations.themeDesc),
       delegate: OpenDelegate(
@@ -173,7 +174,7 @@ class _BackupItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListItem.open(
-      leading: const Icon(Icons.cloud_sync),
+      leading: const Icon(CupertinoIcons.cloud_upload_fill),
       title: Text(appLocalizations.backupAndRecovery),
       subtitle: Text(appLocalizations.backupAndRecoveryDesc),
       delegate: OpenDelegate(
@@ -190,7 +191,7 @@ class _HotkeyItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListItem.open(
-      leading: const Icon(Icons.keyboard),
+      leading: const Icon(CupertinoIcons.keyboard),
       title: Text(appLocalizations.hotkeyManagement),
       subtitle: Text(appLocalizations.hotkeyManagementDesc),
       delegate: OpenDelegate(
@@ -207,7 +208,7 @@ class _LoopbackItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListItem(
-      leading: const Icon(Icons.lock),
+      leading: const Icon(CupertinoIcons.lock),
       title: Text(appLocalizations.loopback),
       subtitle: Text(appLocalizations.loopbackDesc),
       onTap: () {
@@ -226,7 +227,7 @@ class _AccessItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListItem.open(
-      leading: const Icon(Icons.view_list),
+      leading: const Icon(CupertinoIcons.list_bullet),
       title: Text(appLocalizations.accessControl),
       subtitle: Text(appLocalizations.accessControlDesc),
       delegate: OpenDelegate(
@@ -243,7 +244,7 @@ class _ConfigItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListItem.open(
-      leading: const Icon(Icons.edit),
+      leading: const Icon(CupertinoIcons.pencil),
       title: Text(appLocalizations.basicConfig),
       subtitle: Text(appLocalizations.basicConfigDesc),
       delegate: OpenDelegate(
@@ -260,7 +261,7 @@ class _SettingItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListItem.open(
-      leading: const Icon(Icons.settings),
+      leading: const Icon(CupertinoIcons.gear),
       title: Text(appLocalizations.application),
       subtitle: Text(appLocalizations.applicationDesc),
       delegate: OpenDelegate(
@@ -277,7 +278,7 @@ class _DisclaimerItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListItem(
-      leading: const Icon(Icons.gavel),
+      leading: const Icon(CupertinoIcons.doc_plaintext),
       title: Text(appLocalizations.disclaimer),
       onTap: () async {
         final isDisclaimerAccepted =
@@ -296,7 +297,7 @@ class _InfoItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListItem.open(
-      leading: const Icon(Icons.info),
+      leading: const Icon(CupertinoIcons.info),
       title: Text(appLocalizations.about),
       delegate: OpenDelegate(
         title: appLocalizations.about,
@@ -312,7 +313,7 @@ class _DeveloperItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListItem.open(
-      leading: const Icon(Icons.developer_board),
+      leading: const Icon(CupertinoIcons.hammer),
       title: Text(appLocalizations.developerMode),
       delegate: OpenDelegate(
         title: appLocalizations.developerMode,

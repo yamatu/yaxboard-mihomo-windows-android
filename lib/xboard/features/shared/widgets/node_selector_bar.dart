@@ -4,18 +4,22 @@ import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/views/proxies/proxies.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_clash/xboard/features/latency/services/auto_latency_service.dart';
 import 'package:fl_clash/xboard/features/latency/widgets/latency_indicator.dart';
 import 'package:fl_clash/l10n/l10n.dart';
+
 class NodeSelectorBar extends ConsumerStatefulWidget {
   const NodeSelectorBar({super.key});
   @override
   ConsumerState<NodeSelectorBar> createState() => _NodeSelectorBarState();
 }
+
 class _NodeSelectorBarState extends ConsumerState<NodeSelectorBar> {
   String? _lastProxyName;
   bool _isFirstBuild = true;
+  bool _isPressed = false;
   @override
   void initState() {
     super.initState();
@@ -71,7 +75,7 @@ class _NodeSelectorBarState extends ConsumerState<NodeSelectorBar> {
         if (selectedProxyName != null && selectedProxyName.isNotEmpty) {
           final referencedGroup = groups.firstWhere(
             (g) => g.name == selectedProxyName,
-            orElse: () => group, // 如果没找到引用的组，就使用当前组
+            orElse: () => group,
           );
           if (referencedGroup.name == selectedProxyName && referencedGroup.type == GroupType.URLTest) {
             currentGroup = referencedGroup;
@@ -104,7 +108,6 @@ class _NodeSelectorBarState extends ConsumerState<NodeSelectorBar> {
     }
     final selectedProxyName = selectedMap[currentGroup.name] ?? "";
     String realNodeName;
-    // 对于 URLTest 分组, 优先使用用户手动选择的节点名称, 若没有再回退到当前测速结果(now)
     if (currentGroup.type == GroupType.URLTest) {
       if (selectedProxyName.isNotEmpty) {
         realNodeName = selectedProxyName;
@@ -128,92 +131,142 @@ class _NodeSelectorBarState extends ConsumerState<NodeSelectorBar> {
       child: _buildProxyDisplay(context, currentGroup, currentProxy),
     );
   }
+
   Widget _buildProxyDisplay(BuildContext context, Group group, Proxy proxy) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => CommonScaffold(
-                title: AppLocalizations.of(context).xboardProxy,
-                body: const ProxiesView(),
-              ),
+    final primaryColor = CupertinoTheme.of(context).primaryColor;
+    final labelColor = CupertinoDynamicColor.resolve(CupertinoColors.label, context);
+    final secondaryLabelColor =
+        CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context);
+
+    return AnimatedScale(
+      scale: _isPressed ? 0.985 : 1,
+      duration: const Duration(milliseconds: 160),
+      curve: Curves.easeOutCubic,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          color: CupertinoDynamicColor.resolve(
+            CupertinoColors.tertiarySystemGroupedBackground,
+            context,
+          ).withValues(alpha: 0.68),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: primaryColor.withValues(alpha: 0.10),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: primaryColor.withValues(alpha: 0.08),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
             ),
-          );
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.router,
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      proxy.name,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 3),
-                    _buildProxyLatency(proxy),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => CommonScaffold(
-                        title: AppLocalizations.of(context).xboardProxy,
-                        body: const ProxiesView(),
-                      ),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                  minimumSize: const Size(56, 30),
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+          ],
+        ),
+        child: GestureDetector(
+          onTap: () => _openProxySwitcher(context),
+          onTapDown: (_) {
+            setState(() {
+              _isPressed = true;
+            });
+          },
+          onTapCancel: () {
+            if (!mounted) return;
+            setState(() {
+              _isPressed = false;
+            });
+          },
+          onTapUp: (_) {
+            if (!mounted) return;
+            setState(() {
+              _isPressed = false;
+            });
+          },
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: primaryColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    CupertinoIcons.antenna_radiowaves_left_right,
+                    color: primaryColor,
+                    size: 18,
                   ),
                 ),
-                child: Text(
-                  AppLocalizations.of(context).xboardSwitch,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 260),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    transitionBuilder: (child, animation) {
+                      final offsetAnimation = Tween<Offset>(
+                        begin: const Offset(0, 0.12),
+                        end: Offset.zero,
+                      ).animate(animation);
+                      return FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(
+                          position: offsetAnimation,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: Column(
+                      key: ValueKey('${group.name}-${proxy.name}'),
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          proxy.name,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: labelColor,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 3),
+                        DefaultTextStyle(
+                          style: TextStyle(
+                            color: secondaryLabelColor,
+                            fontSize: 12,
+                          ),
+                          child: _buildProxyLatency(proxy),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 10),
+                CupertinoButton(
+                  onPressed: () => _openProxySwitcher(context),
+                  color: primaryColor,
+                  minSize: 32,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Text(
+                    AppLocalizations.of(context).xboardSwitch,
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: CupertinoColors.white),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+
   Widget _buildProxyLatency(Proxy proxy) {
     final delayState = ref.watch(getDelayProvider(
       proxyName: proxy.name,
@@ -225,27 +278,46 @@ class _NodeSelectorBarState extends ConsumerState<NodeSelectorBar> {
       showIcon: true,
     );
   }
+
   Widget _buildEmptyState(BuildContext context) {
+    final primaryColor = CupertinoTheme.of(context).primaryColor;
+    final labelColor = CupertinoDynamicColor.resolve(CupertinoColors.label, context);
+    final secondaryLabelColor = CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(12),
+          color: CupertinoDynamicColor.resolve(
+            CupertinoColors.tertiarySystemGroupedBackground,
+            context,
+          ).withValues(alpha: 0.68),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: primaryColor.withValues(alpha: 0.08),
+          ),
         ),
         padding: const EdgeInsets.all(14),
         child: Row(
           children: [
             Container(
-              width: 36,
-              height: 36,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.errorContainer,
-                borderRadius: BorderRadius.circular(8),
+                color: CupertinoDynamicColor.resolve(
+                  CupertinoColors.destructiveRed,
+                  context,
+                ).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
-                Icons.wifi_off,
-                color: Theme.of(context).colorScheme.onErrorContainer,
+                CupertinoIcons.wifi_slash,
+                color: CupertinoDynamicColor.resolve(
+                  CupertinoColors.destructiveRed,
+                  context,
+                ),
                 size: 18,
               ),
             ),
@@ -257,45 +329,32 @@ class _NodeSelectorBarState extends ConsumerState<NodeSelectorBar> {
                 children: [
                   Text(
                     AppLocalizations.of(context).xboardNoAvailableNodes,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    style: TextStyle(
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.onSurface,
+                      color: labelColor,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     AppLocalizations.of(context).xboardClickToSetupNodes,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    style: TextStyle(
                       fontSize: 12,
+                      color: secondaryLabelColor,
                     ),
                   ),
                 ],
               ),
             ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => CommonScaffold(
-                      title: AppLocalizations.of(context).xboardProxy,
-                      body: const ProxiesView(),
-                    ),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                minimumSize: const Size(56, 30),
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
+            CupertinoButton(
+              onPressed: () => _openProxySwitcher(context),
+              color: primaryColor,
+              minSize: 32,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              borderRadius: BorderRadius.circular(10),
               child: Text(
                 AppLocalizations.of(context).xboardSetup,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: CupertinoColors.white),
               ),
             ),
           ],
@@ -303,6 +362,43 @@ class _NodeSelectorBarState extends ConsumerState<NodeSelectorBar> {
       ),
     );
   }
+
+  Future<void> _openProxySwitcher(BuildContext context) async {
+    await Navigator.of(context).push(
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 280),
+        reverseTransitionDuration: const Duration(milliseconds: 220),
+        pageBuilder: (_, animation, __) {
+          return FadeTransition(
+            opacity: animation,
+            child: CommonScaffold(
+              title: AppLocalizations.of(context).xboardProxy,
+              body: const ProxiesView(),
+            ),
+          );
+        },
+        transitionsBuilder: (_, animation, __, child) {
+          final offset = Tween<Offset>(
+            begin: const Offset(0, 0.04),
+            end: Offset.zero,
+          ).animate(
+            CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            ),
+          );
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: offset,
+              child: child,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _checkNodeChange(Proxy currentProxy) {
     if (_isFirstBuild) {
       _lastProxyName = currentProxy.name;
@@ -314,6 +410,7 @@ class _NodeSelectorBarState extends ConsumerState<NodeSelectorBar> {
       autoLatencyService.onNodeChanged();
     }
   }
+
   void _handleManualTest(Proxy proxy) {
     autoLatencyService.testProxy(proxy, forceTest: true);
   }

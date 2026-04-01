@@ -7,6 +7,7 @@ import 'package:fl_clash/views/proxies/common.dart';
 import 'package:fl_clash/views/proxies/list.dart';
 import 'package:fl_clash/views/proxies/providers.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -28,32 +29,34 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> with PageMixin {
   @override
   get actions => [
         if (_isTab)
-          IconButton(
+          CupertinoButton(
+            padding: EdgeInsets.zero,
             onPressed: () {
               _proxiesTabKey.currentState?.scrollToGroupSelected();
             },
-            icon: Icon(
-              Icons.adjust,
-              weight: 1,
+            child: Icon(
+              CupertinoIcons.scope,
+              size: 22,
             ),
           ),
         CommonPopupBox(
           targetBuilder: (open) {
-            return IconButton(
+            return CupertinoButton(
+              padding: EdgeInsets.zero,
               onPressed: () {
                 open(
                   offset: Offset(0, 20),
                 );
               },
-              icon: Icon(
-                Icons.more_vert,
+              child: Icon(
+                CupertinoIcons.ellipsis_vertical,
               ),
             );
           },
           popup: CommonPopupMenu(
             items: [
               PopupMenuItemData(
-                icon: Icons.tune,
+                icon: CupertinoIcons.slider_horizontal_3,
                 label: appLocalizations.settings,
                 onPressed: () {
                   showSheet(
@@ -73,7 +76,7 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> with PageMixin {
               ),
               if (_hasProviders)
                 PopupMenuItemData(
-                  icon: Icons.poll_outlined,
+                  icon: CupertinoIcons.chart_bar,
                   label: appLocalizations.providers,
                   onPressed: () {
                     showExtend(
@@ -88,7 +91,7 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> with PageMixin {
                 ),
               if (!_isTab)
                 PopupMenuItemData(
-                  icon: Icons.style_outlined,
+                  icon: CupertinoIcons.paintbrush,
                   label: appLocalizations.iconConfiguration,
                   onPressed: () {
                     showExtend(
@@ -140,7 +143,8 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> with PageMixin {
   void initState() {
     [
       if (_hasProviders)
-        IconButton(
+        CupertinoButton(
+          padding: EdgeInsets.zero,
           onPressed: () {
             showExtend(
               context,
@@ -151,20 +155,22 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> with PageMixin {
               },
             );
           },
-          icon: const Icon(
-            Icons.poll_outlined,
+          child: const Icon(
+            CupertinoIcons.chart_bar,
           ),
         ),
       _isTab
-          ? IconButton(
+          ? CupertinoButton(
+              padding: EdgeInsets.zero,
               onPressed: () {
                 _proxiesTabKey.currentState?.scrollToGroupSelected();
               },
-              icon: const Icon(
-                Icons.adjust_outlined,
+              child: const Icon(
+                CupertinoIcons.scope,
               ),
             )
-          : IconButton(
+          : CupertinoButton(
+              padding: EdgeInsets.zero,
               onPressed: () {
                 showExtend(
                   context,
@@ -177,11 +183,12 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> with PageMixin {
                   },
                 );
               },
-              icon: const Icon(
-                Icons.style_outlined,
+              child: const Icon(
+                CupertinoIcons.paintbrush,
               ),
             ),
-      IconButton(
+      CupertinoButton(
+        padding: EdgeInsets.zero,
         onPressed: () {
           showSheet(
             context: context,
@@ -197,8 +204,8 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> with PageMixin {
             },
           );
         },
-        icon: const Icon(
-          Icons.tune,
+        child: const Icon(
+          CupertinoIcons.slider_horizontal_3,
         ),
       )
     ];
@@ -239,17 +246,31 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> with PageMixin {
         ),
       ProxiesType.list => const ProxiesListView(),
     };
-    return Stack(
-      children: [
-        Positioned.fill(child: body),
-        Positioned(
-          right: 16,
-          bottom: 16,
-          child: DelayTestButton(
-            onClick: _delayTestAllNodes,
+    return FadeThroughBox(
+      child: Stack(
+        key: ValueKey(proxiesType),
+        children: [
+          Positioned.fill(child: body),
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.92, end: 1),
+              duration: const Duration(milliseconds: 280),
+              curve: Curves.easeOutCubic,
+              builder: (_, value, child) {
+                return Transform.scale(
+                  scale: value,
+                  child: child,
+                );
+              },
+              child: DelayTestButton(
+                onClick: _delayTestAllNodes,
+              ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

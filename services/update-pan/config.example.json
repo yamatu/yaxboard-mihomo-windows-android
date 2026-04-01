@@ -1,0 +1,16 @@
+{
+  "listen_addr": ":8080",
+  "public_base_url": "https://your-update.example.com",
+  "provider": "mihomo",
+  "panel_url": "https://your-panel.example.com",
+  "panel_desc": "Main panel",
+  "subscription_url": "https://your-subscription.example.com",
+  "subscription_desc": "Main subscription",
+  "assets_dir": "./data/files",
+  "manifest_path": "./data/releases.json",
+  "check_path": "/api/v1/check-update",
+  "config_path": "/config.json",
+  "files_path": "/files/",
+  "read_timeout_seconds": 10,
+  "write_timeout_seconds": 60
+}

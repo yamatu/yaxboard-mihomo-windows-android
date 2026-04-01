@@ -5,6 +5,7 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -58,7 +59,7 @@ class TrafficUsage extends StatelessWidget {
       child: CommonCard(
         info: Info(
           label: appLocalizations.trafficUsage,
-          iconData: Icons.data_saver_off,
+          iconData: CupertinoIcons.chart_pie,
         ),
         onPressed: () {},
         child: Consumer(
@@ -194,7 +195,7 @@ class TrafficUsage extends StatelessWidget {
                   _buildTrafficDataItem(
                     context,
                     Icon(
-                      Icons.arrow_upward,
+                      CupertinoIcons.arrow_up,
                       color: primaryColor,
                       size: 14,
                     ),
@@ -206,7 +207,7 @@ class TrafficUsage extends StatelessWidget {
                   _buildTrafficDataItem(
                     context,
                     Icon(
-                      Icons.arrow_downward,
+                      CupertinoIcons.arrow_down,
                       color: secondaryColor,
                       size: 14,
                     ),

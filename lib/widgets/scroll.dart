@@ -2,6 +2,7 @@ import 'package:collection/collection.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/state.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class CommonScrollBar extends StatelessWidget {
@@ -16,13 +17,11 @@ class CommonScrollBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scrollbar(
+    return CupertinoScrollbar(
       controller: controller,
       thumbVisibility: true,
-      trackVisibility: true,
-      thickness: 8,
-      radius: const Radius.circular(8),
-      interactive: true,
+      thickness: 6,
+      radius: const Radius.circular(3),
       child: child,
     );
   }
@@ -40,11 +39,10 @@ class CommonAutoHiddenScrollBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scrollbar(
+    return CupertinoScrollbar(
       controller: controller,
-      thickness: 8,
-      radius: const Radius.circular(8),
-      interactive: true,
+      thickness: 6,
+      radius: const Radius.circular(3),
       child: child,
     );
   }

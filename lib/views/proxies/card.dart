@@ -5,6 +5,7 @@ import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/views/proxies/common.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -47,14 +48,17 @@ class ProxyCard extends StatelessWidget {
                   height: measure.labelSmallHeight,
                   width: measure.labelSmallHeight,
                   child: delay == 0
-                      ? const CircularProgressIndicator(
-                          strokeWidth: 2,
+                      ? const CupertinoActivityIndicator(
+                          radius: 8,
                         )
-                      : IconButton(
-                          icon: const Icon(Icons.bolt),
-                          iconSize: globalState.measure.labelSmallHeight,
+                      : CupertinoButton(
                           padding: EdgeInsets.zero,
+                          minSize: globalState.measure.labelSmallHeight,
                           onPressed: _handleTestCurrentDelay,
+                          child: Icon(
+                            CupertinoIcons.bolt,
+                            size: globalState.measure.labelSmallHeight,
+                          ),
                         ),
                 )
               : GestureDetector(
@@ -250,7 +254,7 @@ class _ProxyComputedMark extends ConsumerWidget {
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Theme.of(context).colorScheme.secondaryContainer,
+          color: CupertinoColors.systemGrey5.resolveFrom(context),
         ),
         child: const SelectIcon(),
       ),

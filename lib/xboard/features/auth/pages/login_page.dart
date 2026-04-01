@@ -1,4 +1,3 @@
-
 import 'dart:io';
 
 import 'package:fl_clash/xboard/services/services.dart';
@@ -6,6 +5,7 @@ import 'package:fl_clash/xboard/features/auth/providers/xboard_user_provider.dar
 import 'package:fl_clash/xboard/features/domain_status/domain_status.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'register_page.dart';
@@ -15,11 +15,13 @@ import 'package:fl_clash/xboard/config/utils/config_file_loader.dart';
 import 'package:fl_clash/xboard/utils/xboard_notification.dart';
 import 'package:fl_clash/xboard/sdk/xboard_sdk.dart';
 import 'package:fl_clash/xboard/utils/app_recovery_service.dart';
+
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
   @override
   ConsumerState<LoginPage> createState() => _LoginPageState();
 }
+
 class _LoginPageState extends ConsumerState<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
@@ -28,11 +30,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   bool _isPasswordVisible = false;
   bool _isRepairing = false;
   late XBoardStorageService _storageService;
-  
+
   // 从配置文件加载的应用信息
   String _appTitle = 'XBoard';
   String _appWebsite = 'example.com';
-  
+
   @override
   void initState() {
     super.initState();
@@ -41,7 +43,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     _checkDomainStatus();
     _loadAppInfo();
   }
-  
+
   /// 加载应用信息（标题和网站）
   Future<void> _loadAppInfo() async {
     final title = await ConfigFileLoaderHelper.getAppTitle();
@@ -53,12 +55,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       });
     }
   }
+
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
+
   Future<void> _checkDomainStatus() async {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(domainStatusProvider.notifier).checkDomain();
@@ -89,27 +93,28 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   Future<void> _showRepairDialog() async {
     if (!Platform.isWindows || _isRepairing) return;
-    await showDialog<void>(
+    await showCupertinoDialog<void>(
       context: context,
       builder: (context) {
-        return AlertDialog(
+        return CupertinoAlertDialog(
           title: const Text('网络修复'),
           content: const Text(
             '如果域名解析卡住（本地DNS缓存仍是旧IP），你可以刷新DNS并重试，或者彻底重启软件。',
           ),
           actions: [
-            TextButton(
+            CupertinoDialogAction(
               onPressed: () => Navigator.of(context).pop(),
               child: Text(appLocalizations.cancel),
             ),
-            TextButton(
+            CupertinoDialogAction(
               onPressed: () async {
                 Navigator.of(context).pop();
                 await _flushDnsAndRetry();
               },
               child: const Text('刷新DNS并重试'),
             ),
-            FilledButton(
+            CupertinoDialogAction(
+              isDestructiveAction: false,
               onPressed: () {
                 Navigator.of(context).pop();
                 AppRecoveryService.restartApp(
@@ -125,9 +130,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       },
     );
   }
+
   void refreshCredentials() {
     _loadSavedCredentials();
   }
+
   Future<void> _loadSavedCredentials() async {
     try {
       final savedEmail = await _storageService.getSavedEmail();
@@ -136,7 +143,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       if (savedEmail != null && savedEmail.isNotEmpty) {
         _emailController.text = savedEmail;
       }
-      if (savedPassword != null && savedPassword.isNotEmpty && rememberPassword) {
+      if (savedPassword != null &&
+          savedPassword.isNotEmpty &&
+          rememberPassword) {
         _passwordController.text = savedPassword;
       }
       _rememberPassword = rememberPassword;
@@ -147,8 +156,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       // 忽略加载凭据失败,继续正常流程
     }
   }
+
   Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
+      final authState = ref.read(xboardUserProvider);
+      if (!authState.isInitialized || authState.isLoading) {
+        return;
+      }
+
       final userNotifier = ref.read(xboardUserProvider.notifier);
       final success = await userNotifier.login(
         _emailController.text,
@@ -187,221 +202,249 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       }
     }
   }
+
   void _navigateToRegister() async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const RegisterPage()),
+      CupertinoPageRoute(builder: (context) => const RegisterPage()),
     );
     _loadSavedCredentials();
     _checkDomainStatus();
   }
-  
+
   void _navigateToForgotPassword() async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const ForgotPasswordPage()),
+      CupertinoPageRoute(builder: (context) => const ForgotPasswordPage()),
     );
     _checkDomainStatus();
   }
-    @override
-    Widget build(BuildContext context) {
-      final colorScheme = Theme.of(context).colorScheme;
-      final textTheme = Theme.of(context).textTheme;
-      final domainStatus = ref.watch(domainStatusProvider);
-      final userState = ref.watch(xboardUserProvider);
-  
-      return Scaffold(
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          actions: [
-            if (Platform.isWindows)
-              IconButton(
-                tooltip: '网络修复/重启',
-                onPressed: _isRepairing ? null : _showRepairDialog,
-                icon: _isRepairing
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.restart_alt),
-              ),
-            const LanguageSelector(),
-            const SizedBox(width: 8),
-            Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: GestureDetector(
-                onTap: () => showDomainStatusDialog(context),
-                child: const DomainStatusIndicator(),
-              ),
+
+  @override
+  Widget build(BuildContext context) {
+    final primaryColor = CupertinoTheme.of(context).primaryColor;
+    final labelColor = CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context);
+    final textColor = CupertinoDynamicColor.resolve(CupertinoColors.label, context);
+    final bgColor = CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context);
+    final domainStatus = ref.watch(domainStatusProvider);
+    final userState = ref.watch(xboardUserProvider);
+    final isAuthChecking = !userState.isInitialized;
+    final isBusy = userState.isLoading || isAuthChecking;
+    final canSubmit = domainStatus.isReady && !isBusy;
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          if (Platform.isWindows)
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              onPressed: _isRepairing ? null : _showRepairDialog,
+              child: _isRepairing
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CupertinoActivityIndicator(),
+                    )
+                  : const Icon(CupertinoIcons.restart, size: 22),
             ),
-          ],
-        ),
-        extendBodyBehindAppBar: true,
-        body: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                colorScheme.surface,
-                colorScheme.surface.withValues(alpha: 0.8),
-              ],
+          const LanguageSelector(),
+          const SizedBox(width: 8),
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: GestureDetector(
+              onTap: () => showDomainStatusDialog(context),
+              child: const DomainStatusIndicator(),
             ),
           ),
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 400),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Center(
-                        child: Column(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: colorScheme.primary.withValues(alpha: 0.1),
-                              ),
-                              child: Icon(
-                                Icons.vpn_key_outlined,
-                                size: 48,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            Text(
-                              _appTitle,
-                              style: textTheme.displaySmall?.copyWith(
-                                color: colorScheme.onSurface,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              _appWebsite,
-                              style: textTheme.titleMedium?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 48),
-                      XBInputField(
-                        controller: _emailController,
-                        labelText: appLocalizations.xboardEmail,
-                        hintText: appLocalizations.xboardEmail,
-                        prefixIcon: Icons.email_outlined,
-                        keyboardType: TextInputType.emailAddress,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return appLocalizations.xboardEmail;
-                          }
-                          if (!value.contains('@')) {
-                            return appLocalizations.xboardEmail;
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      XBInputField(
-                        controller: _passwordController,
-                        labelText: appLocalizations.xboardPassword,
-                        hintText: appLocalizations.xboardPassword,
-                        prefixIcon: Icons.lock_outlined,
-                        obscureText: !_isPasswordVisible,
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _isPasswordVisible
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _isPasswordVisible = !_isPasswordVisible;
-                            });
-                          },
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return appLocalizations.xboardPassword;
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
+        ],
+      ),
+      extendBodyBehindAppBar: true,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              bgColor,
+              bgColor.withValues(alpha: 0.8),
+            ],
+          ),
+        ),
+        child: Center(
+          child: SingleChildScrollView(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Column(
                         children: [
-                          SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: Checkbox(
-                              value: _rememberPassword,
-                              onChanged: (value) {
-                                setState(() {
-                                  _rememberPassword = value ?? false;
-                                });
-                              },
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: primaryColor.withValues(alpha: 0.1),
+                            ),
+                            child: Icon(
+                              CupertinoIcons.lock_shield,
+                              size: 48,
+                              color: primaryColor,
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: () {
+                          const SizedBox(height: 24),
+                          Text(
+                            _appTitle,
+                            style: TextStyle(
+                              fontSize: 34,
+                              fontWeight: FontWeight.bold,
+                              color: textColor,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _appWebsite,
+                            style: TextStyle(
+                              fontSize: 17,
+                              color: labelColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 48),
+                    XBInputField(
+                      controller: _emailController,
+                      labelText: appLocalizations.xboardEmail,
+                      hintText: appLocalizations.xboardEmail,
+                      prefixIcon: CupertinoIcons.mail,
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return appLocalizations.xboardEmail;
+                        }
+                        if (!value.contains('@')) {
+                          return appLocalizations.xboardEmail;
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    XBInputField(
+                      controller: _passwordController,
+                      labelText: appLocalizations.xboardPassword,
+                      hintText: appLocalizations.xboardPassword,
+                      prefixIcon: CupertinoIcons.lock,
+                      obscureText: !_isPasswordVisible,
+                      suffixIcon: CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        child: Icon(
+                          _isPasswordVisible
+                              ? CupertinoIcons.eye
+                              : CupertinoIcons.eye_slash,
+                          color: labelColor,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _isPasswordVisible = !_isPasswordVisible;
+                          });
+                        },
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return appLocalizations.xboardPassword;
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        SizedBox(
+                          height: 30,
+                          child: CupertinoSwitch(
+                            value: _rememberPassword,
+                            activeTrackColor: primaryColor,
+                            onChanged: (value) {
                               setState(() {
-                                _rememberPassword = !_rememberPassword;
+                                _rememberPassword = value;
                               });
                             },
-                            child: Text(
-                              appLocalizations.xboardRememberPassword,
-                              style: textTheme.bodyMedium,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _rememberPassword = !_rememberPassword;
+                            });
+                          },
+                          child: Text(
+                            appLocalizations.xboardRememberPassword,
+                            style: TextStyle(
+                              fontSize: 15,
+                              color: textColor,
                             ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 32),
-                      SizedBox(
-                        height: 48,
-                        child: FilledButton(
-                          onPressed: domainStatus.isReady && !userState.isLoading ? _login : null,
-                          child: userState.isLoading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : Text(appLocalizations.xboardLogin),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+                    if (isAuthChecking) ...[
+                      Text(
+                        '正在检查登录状态，请稍候...',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: labelColor,
                         ),
                       ),
-                      const SizedBox(height: 24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          TextButton(
-                            onPressed: _navigateToForgotPassword,
-                            child: Text(
-                              appLocalizations.xboardForgotPassword,
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: _navigateToRegister,
-                            child: Text(
-                              appLocalizations.xboardRegister,
-                            ),
-                          ),
-                        ],
-                      ),
+                      const SizedBox(height: 12),
                     ],
-                  ),
+                    SizedBox(
+                      height: 48,
+                      child: CupertinoButton.filled(
+                        onPressed: canSubmit ? _login : null,
+                        padding: EdgeInsets.zero,
+                        child: isBusy
+                            ? const CupertinoActivityIndicator(
+                                color: CupertinoColors.white,
+                              )
+                            : Text(appLocalizations.xboardLogin),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        CupertinoButton(
+                          padding: EdgeInsets.zero,
+                          onPressed: _navigateToForgotPassword,
+                          child: Text(
+                            appLocalizations.xboardForgotPassword,
+                          ),
+                        ),
+                        CupertinoButton(
+                          padding: EdgeInsets.zero,
+                          onPressed: _navigateToRegister,
+                          child: Text(
+                            appLocalizations.xboardRegister,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
         ),
-      );
-    }}
+      ),
+    );
+  }
+}

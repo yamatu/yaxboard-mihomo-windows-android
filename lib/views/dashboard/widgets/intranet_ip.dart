@@ -2,6 +2,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -15,7 +16,7 @@ class IntranetIP extends StatelessWidget {
       child: CommonCard(
         info: Info(
           label: appLocalizations.intranetIP,
-          iconData: Icons.devices,
+          iconData: CupertinoIcons.device_laptop,
         ),
         onPressed: () {},
         child: Container(
@@ -48,9 +49,7 @@ class IntranetIP extends StatelessWidget {
                               padding: EdgeInsets.all(2),
                               child: AspectRatio(
                                 aspectRatio: 1,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
+                                child: CupertinoActivityIndicator(),
                               ),
                             ),
                     );

@@ -6,6 +6,7 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -31,7 +32,8 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView>
 
   @override
   List<Widget> get actions => [
-        IconButton(
+        CupertinoButton(
+          padding: EdgeInsets.zero,
           onPressed: () async {
             clashCore.closeConnections();
             _connectionsStateNotifier.value =
@@ -39,7 +41,7 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView>
               connections: await clashCore.getConnections(),
             );
           },
-          icon: const Icon(Icons.delete_sweep_outlined),
+          child: const Icon(CupertinoIcons.delete),
         ),
       ];
 
@@ -129,8 +131,9 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView>
                 onClickKeyword: (value) {
                   context.commonScaffoldState?.addKeyword(value);
                 },
-                trailing: IconButton(
-                  icon: const Icon(Icons.block),
+                trailing: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  child: const Icon(CupertinoIcons.nosign),
                   onPressed: () {
                     _handleBlockConnection(connection.id);
                   },

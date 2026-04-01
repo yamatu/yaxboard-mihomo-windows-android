@@ -7,6 +7,7 @@ import 'package:fl_clash/models/core.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -88,12 +89,13 @@ class _ProvidersViewState extends ConsumerState<ProvidersView> {
     );
     return AdaptiveSheetScaffold(
       actions: [
-        IconButton(
+        CupertinoButton(
+          padding: EdgeInsets.zero,
           onPressed: () {
             _updateProviders();
           },
-          icon: const Icon(
-            Icons.sync,
+          child: const Icon(
+            CupertinoIcons.arrow_2_circlepath,
           ),
         )
       ],
@@ -200,13 +202,13 @@ class ProviderItem extends StatelessWidget {
             spacing: 12,
             children: [
               CommonChip(
-                avatar: const Icon(Icons.upload),
+                avatar: const Icon(CupertinoIcons.cloud_upload),
                 label: appLocalizations.upload,
                 onPressed: _handleSideLoadProvider,
               ),
               if (provider.vehicleType == "HTTP")
                 CommonChip(
-                  avatar: const Icon(Icons.sync),
+                  avatar: const Icon(CupertinoIcons.arrow_2_circlepath),
                   label: appLocalizations.sync,
                   onPressed: _handleUpdateProvider,
                 ),
@@ -224,7 +226,7 @@ class ProviderItem extends StatelessWidget {
           child: provider.isUpdating
               ? const Padding(
                   padding: EdgeInsets.all(8),
-                  child: CircularProgressIndicator(),
+                  child: CupertinoActivityIndicator(),
                 )
               : const SizedBox(),
         ),

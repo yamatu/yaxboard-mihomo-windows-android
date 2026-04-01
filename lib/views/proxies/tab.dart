@@ -4,6 +4,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -56,14 +57,15 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
     return Consumer(
       builder: (_, ref, ___) {
         final isMobileView = ref.watch(isMobileViewProvider);
-        return IconButton(
+        return CupertinoButton(
+          padding: EdgeInsets.zero,
           onPressed: _showMoreMenu,
-          icon: isMobileView
+          child: isMobileView
               ? const Icon(
-                  Icons.expand_more,
+                  CupertinoIcons.chevron_down,
                 )
               : const Icon(
-                  Icons.chevron_right,
+                  CupertinoIcons.chevron_right,
                 ),
         );
       },
@@ -436,10 +438,21 @@ class _DelayTestButtonState extends State<DelayTestButton>
           ),
         );
       },
-      child: FloatingActionButton(
-        heroTag: null,
+      child: CupertinoButton(
+        padding: EdgeInsets.zero,
         onPressed: _healthcheck,
-        child: const Icon(Icons.network_ping),
+        child: Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: CupertinoColors.systemBlue,
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            CupertinoIcons.antenna_radiowaves_left_right,
+            color: CupertinoColors.white,
+          ),
+        ),
       ),
     );
   }

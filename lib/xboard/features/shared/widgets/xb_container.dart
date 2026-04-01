@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+
 class XBContainer extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
@@ -17,11 +19,12 @@ class XBContainer extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final bgColor = backgroundColor ??
+        CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context);
     Widget content = Container(
       padding: padding,
       margin: margin,
-      color: backgroundColor ?? colorScheme.surface,
+      color: bgColor,
       child: child,
     );
     if (safeArea) {

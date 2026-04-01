@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/widgets/scroll.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class BaseScrollBehavior extends MaterialScrollBehavior {
@@ -15,6 +16,11 @@ class BaseScrollBehavior extends MaterialScrollBehavior {
         if (system.isDesktop) PointerDeviceKind.mouse,
         PointerDeviceKind.unknown,
       };
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    return const BouncingScrollPhysics();
+  }
 }
 
 class HiddenBarScrollBehavior extends BaseScrollBehavior {

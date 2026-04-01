@@ -9,6 +9,7 @@ import 'package:fl_clash/models/selector.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -93,17 +94,17 @@ class _ThemeModeItem extends ConsumerWidget {
         ref.watch(themeSettingProvider.select((state) => state.themeMode));
     List<ThemeModeItem> themeModeItems = [
       ThemeModeItem(
-        iconData: Icons.auto_mode,
+        iconData: CupertinoIcons.circle_lefthalf_fill,
         label: appLocalizations.auto,
         themeMode: ThemeMode.system,
       ),
       ThemeModeItem(
-        iconData: Icons.light_mode,
+        iconData: CupertinoIcons.sun_max,
         label: appLocalizations.light,
         themeMode: ThemeMode.light,
       ),
       ThemeModeItem(
-        iconData: Icons.dark_mode,
+        iconData: CupertinoIcons.moon,
         label: appLocalizations.dark,
         themeMode: ThemeMode.dark,
       ),
@@ -111,7 +112,7 @@ class _ThemeModeItem extends ConsumerWidget {
     return ItemCard(
       info: Info(
         label: appLocalizations.themeMode,
-        iconData: Icons.brightness_high,
+        iconData: CupertinoIcons.brightness,
       ),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -320,7 +321,7 @@ class _PrimaryColorItemState extends ConsumerState<_PrimaryColorItem> {
       child: ItemCard(
         info: Info(
           label: appLocalizations.themeColor,
-          iconData: Icons.palette,
+          iconData: CupertinoIcons.paintbrush,
         ),
         actions: genActions(
           [
@@ -345,12 +346,11 @@ class _PrimaryColorItemState extends ConsumerState<_PrimaryColorItem> {
                 child: Text(appLocalizations.cancel),
               ),
             if (_removablePrimaryColor == null && !isEquals)
-              IconButton.filledTonal(
-                iconSize: 20,
+              CupertinoButton(
                 padding: EdgeInsets.all(4),
-                visualDensity: VisualDensity.compact,
+                minSize: 0,
                 onPressed: _handleReset,
-                icon: Icon(Icons.replay),
+                child: Icon(CupertinoIcons.arrow_counterclockwise, size: 20),
               )
           ],
           space: 8,
@@ -405,13 +405,14 @@ class _PrimaryColorItemState extends ConsumerState<_PrimaryColorItem> {
                             Container(
                               color: Colors.white.opacity0,
                               padding: EdgeInsets.all(8),
-                              child: IconButton.filledTonal(
+                              child: CupertinoButton(
                                 onPressed: _handleDel,
                                 padding: EdgeInsets.all(12),
-                                iconSize: 30,
-                                icon: Icon(
+                                minSize: 0,
+                                child: Icon(
                                   color: context.colorScheme.primary,
-                                  Icons.delete,
+                                  CupertinoIcons.delete,
+                                  size: 30,
                                 ),
                               ),
                             ),
@@ -425,12 +426,14 @@ class _PrimaryColorItemState extends ConsumerState<_PrimaryColorItem> {
                       padding: EdgeInsets.all(
                         4,
                       ),
-                      child: IconButton.filledTonal(
+                      child: CupertinoButton(
                         onPressed: _handleAdd,
-                        iconSize: 32,
-                        icon: Icon(
+                        minSize: 0,
+                        padding: EdgeInsets.zero,
+                        child: Icon(
                           color: context.colorScheme.primary,
-                          Icons.add,
+                          CupertinoIcons.add,
+                          size: 32,
                         ),
                       ),
                     )
@@ -456,12 +459,14 @@ class _PrueBlackItem extends ConsumerWidget {
     );
     return ListItem.switchItem(
       leading: Icon(
-        Icons.contrast,
+        CupertinoIcons.circle_lefthalf_fill,
       ),
       horizontalTitleGap: 12,
       title: Text(
         appLocalizations.pureBlackMode,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+        style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
               color: context.colorScheme.onSurfaceVariant,
             ),
       ),
@@ -497,12 +502,14 @@ class _TextScaleFactorItem extends ConsumerWidget {
           padding: EdgeInsets.only(bottom: 8),
           child: ListItem.switchItem(
             leading: Icon(
-              Icons.text_fields,
+              CupertinoIcons.textformat_size,
             ),
             horizontalTitleGap: 12,
             title: Text(
               appLocalizations.textScale,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                     color: context.colorScheme.onSurfaceVariant,
                   ),
             ),
@@ -530,22 +537,18 @@ class _TextScaleFactorItem extends ConsumerWidget {
                   status: !textScale.enable,
                   child: ActivateBox(
                     active: textScale.enable,
-                    child: SliderTheme(
-                      data: _SliderDefaultsM3(context),
-                      child: Slider(
-                        padding: EdgeInsets.zero,
-                        min: minTextScale,
-                        max: maxTextScale,
-                        value: textScale.scale,
-                        onChanged: (value) {
-                          ref.read(themeSettingProvider.notifier).updateState(
-                                (state) => state.copyWith.textScale(
-                                  scale: value,
-                                ),
-                              );
+                    child: CupertinoSlider(
+                      min: minTextScale,
+                      max: maxTextScale,
+                      value: textScale.scale,
+                      onChanged: (value) {
+                        ref.read(themeSettingProvider.notifier).updateState(
+                              (state) => state.copyWith.textScale(
+                                scale: value,
+                              ),
+                            );
                         },
                       ),
-                    ),
                   ),
                 ),
               ),
@@ -627,111 +630,3 @@ class _PaletteDialogState extends State<_PaletteDialog> {
   }
 }
 
-class _SliderDefaultsM3 extends SliderThemeData {
-  _SliderDefaultsM3(this.context) : super(trackHeight: 16.0);
-
-  final BuildContext context;
-  late final ColorScheme _colors = Theme.of(context).colorScheme;
-
-  @override
-  Color? get activeTrackColor => _colors.primary;
-
-  @override
-  Color? get inactiveTrackColor => _colors.secondaryContainer;
-
-  @override
-  Color? get secondaryActiveTrackColor => _colors.primary.withOpacity(0.54);
-
-  @override
-  Color? get disabledActiveTrackColor => _colors.onSurface.withOpacity(0.38);
-
-  @override
-  Color? get disabledInactiveTrackColor => _colors.onSurface.withOpacity(0.12);
-
-  @override
-  Color? get disabledSecondaryActiveTrackColor =>
-      _colors.onSurface.withOpacity(0.38);
-
-  @override
-  Color? get activeTickMarkColor => _colors.onPrimary.withOpacity(1.0);
-
-  @override
-  Color? get inactiveTickMarkColor =>
-      _colors.onSecondaryContainer.withOpacity(1.0);
-
-  @override
-  Color? get disabledActiveTickMarkColor => _colors.onInverseSurface;
-
-  @override
-  Color? get disabledInactiveTickMarkColor => _colors.onSurface;
-
-  @override
-  Color? get thumbColor => _colors.primary;
-
-  @override
-  Color? get disabledThumbColor => _colors.onSurface.withOpacity(0.38);
-
-  @override
-  Color? get overlayColor =>
-      WidgetStateColor.resolveWith((Set<WidgetState> states) {
-        if (states.contains(WidgetState.dragged)) {
-          return _colors.primary.withOpacity(0.1);
-        }
-        if (states.contains(WidgetState.hovered)) {
-          return _colors.primary.withOpacity(0.08);
-        }
-        if (states.contains(WidgetState.focused)) {
-          return _colors.primary.withOpacity(0.1);
-        }
-
-        return Colors.transparent;
-      });
-
-  @override
-  TextStyle? get valueIndicatorTextStyle =>
-      Theme.of(context).textTheme.labelLarge!.copyWith(
-            color: _colors.onInverseSurface,
-          );
-
-  @override
-  Color? get valueIndicatorColor => _colors.inverseSurface;
-
-  @override
-  SliderComponentShape? get valueIndicatorShape =>
-      const RoundedRectSliderValueIndicatorShape();
-
-  @override
-  SliderComponentShape? get thumbShape => const HandleThumbShape();
-
-  @override
-  SliderTrackShape? get trackShape => const GappedSliderTrackShape();
-
-  @override
-  SliderComponentShape? get overlayShape => const RoundSliderOverlayShape();
-
-  @override
-  SliderTickMarkShape? get tickMarkShape =>
-      const RoundSliderTickMarkShape(tickMarkRadius: 4.0 / 2);
-
-  @override
-  WidgetStateProperty<Size?>? get thumbSize {
-    return WidgetStateProperty.resolveWith((Set<WidgetState> states) {
-      if (states.contains(WidgetState.disabled)) {
-        return const Size(4.0, 44.0);
-      }
-      if (states.contains(WidgetState.hovered)) {
-        return const Size(4.0, 44.0);
-      }
-      if (states.contains(WidgetState.focused)) {
-        return const Size(2.0, 44.0);
-      }
-      if (states.contains(WidgetState.pressed)) {
-        return const Size(2.0, 44.0);
-      }
-      return const Size(4.0, 44.0);
-    });
-  }
-
-  @override
-  double? get trackGap => 6.0;
-}

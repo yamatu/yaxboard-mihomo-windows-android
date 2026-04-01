@@ -2,6 +2,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/pages/scan.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class AddProfileView extends StatelessWidget {
@@ -64,19 +65,19 @@ class AddProfileView extends StatelessWidget {
     return ListView(
       children: [
         ListItem(
-          leading: const Icon(Icons.qr_code_sharp),
+          leading: const Icon(CupertinoIcons.qrcode),
           title: Text(appLocalizations.qrcode),
           subtitle: Text(appLocalizations.qrcodeDesc),
           onTap: _toScan,
         ),
         ListItem(
-          leading: const Icon(Icons.upload_file_sharp),
+          leading: const Icon(CupertinoIcons.doc_arrow_up),
           title: Text(appLocalizations.file),
           subtitle: Text(appLocalizations.fileDesc),
           onTap: _handleAddProfileFormFile,
         ),
         ListItem(
-          leading: const Icon(Icons.cloud_download_sharp),
+          leading: const Icon(CupertinoIcons.cloud_download),
           title: Text(appLocalizations.url),
           subtitle: Text(appLocalizations.urlDesc),
           onTap: _toAdd,

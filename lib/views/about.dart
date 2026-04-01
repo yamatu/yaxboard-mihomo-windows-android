@@ -6,6 +6,7 @@ import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/list.dart';
 import 'package:fl_clash/xboard/features/update_check/providers/update_check_provider.dart';
 import 'package:fl_clash/xboard/features/update_check/widgets/update_dialog.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -46,7 +47,7 @@ class AboutView extends ConsumerWidget {
         if (context.mounted) {
           showDialog(
             context: context,
-            builder: (context) => UpdateDialog(state: updateState),
+            builder: (context) => const UpdateDialog(),
           );
         }
       } else if (updateState.error != null) {
@@ -118,7 +119,7 @@ class AboutView extends ConsumerWidget {
               "https://t.me/FlClash",
             );
           },
-          trailing: const Icon(Icons.launch),
+          trailing: const Icon(CupertinoIcons.arrow_up_right_square),
         ),
         ListItem(
           title: Text(appLocalizations.project),
@@ -127,7 +128,7 @@ class AboutView extends ConsumerWidget {
               "https://github.com/$repository",
             );
           },
-          trailing: const Icon(Icons.launch),
+          trailing: const Icon(CupertinoIcons.arrow_up_right_square),
         ),
         ListItem(
           title: Text(appLocalizations.core),
@@ -136,7 +137,7 @@ class AboutView extends ConsumerWidget {
               "https://github.com/chen08209/Clash.Meta/tree/FlClash",
             );
           },
-          trailing: const Icon(Icons.launch),
+          trailing: const Icon(CupertinoIcons.arrow_up_right_square),
         ),
       ],
     );
@@ -203,11 +204,17 @@ class AboutView extends ConsumerWidget {
                       children: [
                         Text(
                           appName,
-                          style: Theme.of(context).textTheme.headlineSmall,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w400,
+                          ),
                         ),
                         Text(
                           globalState.packageInfo.version,
-                          style: Theme.of(context).textTheme.labelLarge,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
                         )
                       ],
                     )
@@ -226,7 +233,10 @@ class AboutView extends ConsumerWidget {
             ),
             Text(
               appLocalizations.desc,
-              style: Theme.of(context).textTheme.bodySmall,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+              ),
             ),
           ],
         ),

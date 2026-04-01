@@ -3,6 +3,7 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -22,16 +23,11 @@ class OutboundMode extends StatelessWidget {
               (state) => state.mode,
             ),
           );
-          return Theme(
-              data: Theme.of(context).copyWith(
-                  splashColor: Colors.transparent,
-                  highlightColor: Colors.transparent,
-                  hoverColor: Colors.transparent),
-              child: CommonCard(
+          return CommonCard(
                 onPressed: () {},
                 info: Info(
                   label: appLocalizations.outboundMode,
-                  iconData: Icons.call_split_sharp,
+                  iconData: CupertinoIcons.arrow_swap,
                 ),
                 child: Padding(
                   padding: const EdgeInsets.only(
@@ -65,17 +61,18 @@ class OutboundMode extends StatelessWidget {
                             ),
                             title: Text(
                               Intl.message(item.name),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.toSoftBold,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: CupertinoDynamicColor.resolve(CupertinoColors.label, context),
+                              ),
                             ),
                           ),
                         ),
                     ],
                   ),
                 ),
-              ));
+              );
         },
       ),
     );
@@ -87,9 +84,9 @@ class OutboundModeV2 extends StatelessWidget {
 
   Color _getTextColor(BuildContext context, Mode mode) {
     return switch (mode) {
-      Mode.rule => context.colorScheme.onSecondaryContainer,
-      Mode.global => context.colorScheme.onPrimaryContainer,
-      Mode.direct => context.colorScheme.onTertiaryContainer,
+      Mode.rule => CupertinoDynamicColor.resolve(CupertinoColors.label, context),
+      Mode.global => CupertinoDynamicColor.resolve(CupertinoColors.label, context),
+      Mode.direct => CupertinoDynamicColor.resolve(CupertinoColors.label, context),
     };
   }
 
@@ -108,9 +105,9 @@ class OutboundModeV2 extends StatelessWidget {
               ),
             );
             final thumbColor = switch (mode) {
-              Mode.rule => context.colorScheme.secondaryContainer,
-              Mode.global => globalState.theme.darken3PrimaryContainer,
-              Mode.direct => context.colorScheme.tertiaryContainer,
+              Mode.rule => CupertinoDynamicColor.resolve(CupertinoColors.secondarySystemGroupedBackground, context),
+              Mode.global => CupertinoTheme.of(context).primaryColor,
+              Mode.direct => CupertinoDynamicColor.resolve(CupertinoColors.tertiarySystemGroupedBackground, context),
             };
             return Container(
               constraints: BoxConstraints.expand(),
@@ -126,18 +123,16 @@ class OutboundModeV2 extends StatelessWidget {
                         height: height - 16,
                         child: Text(
                           Intl.message(item.name),
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleSmall
-                              ?.adjustSize(1)
-                              .copyWith(
-                                color: item == mode
-                                    ? _getTextColor(
-                                        context,
-                                        item,
-                                      )
-                                    : null,
-                              ),
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                            color: item == mode
+                                ? _getTextColor(
+                                    context,
+                                    item,
+                                  )
+                                : CupertinoDynamicColor.resolve(CupertinoColors.label, context),
+                          ),
                         ),
                       ),
                     ),

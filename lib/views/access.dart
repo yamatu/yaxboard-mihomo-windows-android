@@ -8,6 +8,7 @@ import 'package:fl_clash/plugins/app.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -45,8 +46,8 @@ class _AccessViewState extends ConsumerState<AccessView> {
   }
 
   Widget _buildSearchButton() {
-    return IconButton(
-      tooltip: appLocalizations.search,
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
       onPressed: () {
         showSearch(
           context: context,
@@ -62,7 +63,7 @@ class _AccessViewState extends ConsumerState<AccessView> {
           ),
         );
       },
-      icon: const Icon(Icons.search),
+      child: const Icon(CupertinoIcons.search),
     );
   }
 
@@ -73,8 +74,8 @@ class _AccessViewState extends ConsumerState<AccessView> {
     final tooltip = isSelectedAll
         ? appLocalizations.cancelSelectAll
         : appLocalizations.selectAll;
-    return IconButton(
-      tooltip: tooltip,
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
       onPressed: () {
         ref.read(vpnSettingProvider.notifier).updateState((state) {
           final isAccept =
@@ -100,9 +101,9 @@ class _AccessViewState extends ConsumerState<AccessView> {
           }
         });
       },
-      icon: isSelectedAll
-          ? const Icon(Icons.deselect)
-          : const Icon(Icons.select_all),
+      child: isSelectedAll
+          ? const Icon(CupertinoIcons.minus_circle)
+          : const Icon(CupertinoIcons.checkmark_circle),
     );
   }
 
@@ -137,7 +138,8 @@ class _AccessViewState extends ConsumerState<AccessView> {
   }
 
   Widget _buildSettingButton() {
-    return IconButton(
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
       onPressed: () async {
         final res = await showSheet<int>(
           context: context,
@@ -156,7 +158,7 @@ class _AccessViewState extends ConsumerState<AccessView> {
           _intelligentSelected();
         }
       },
-      icon: const Icon(Icons.tune),
+      child: const Icon(CupertinoIcons.slider_horizontal_3),
     );
   }
 
@@ -250,12 +252,10 @@ class _AccessViewState extends ConsumerState<AccessView> {
                                       Flexible(
                                         child: Text(
                                           appLocalizations.selected,
-                                          style: Theme.of(context)
-                                              .textTheme
+                                          style: context.textTheme
                                               .labelLarge
                                               ?.copyWith(
-                                                color: Theme.of(context)
-                                                    .colorScheme
+                                                color: context.colorScheme
                                                     .primary,
                                               ),
                                         ),
@@ -268,12 +268,10 @@ class _AccessViewState extends ConsumerState<AccessView> {
                                       Flexible(
                                         child: Text(
                                           "${valueList.length}",
-                                          style: Theme.of(context)
-                                              .textTheme
+                                          style: context.textTheme
                                               .labelLarge
                                               ?.copyWith(
-                                                color: Theme.of(context)
-                                                    .colorScheme
+                                                color: context.colorScheme
                                                     .primary,
                                               ),
                                         ),
@@ -318,7 +316,7 @@ class _AccessViewState extends ConsumerState<AccessView> {
                       builder: (_, snapshot) {
                         if (snapshot.connectionState != ConnectionState.done) {
                           return Center(
-                            child: CircularProgressIndicator(),
+                            child: CupertinoActivityIndicator(),
                           );
                         }
                         return packages.isEmpty
@@ -433,7 +431,8 @@ class AccessControlSearchDelegate extends SearchDelegate {
   @override
   List<Widget>? buildActions(BuildContext context) {
     return [
-      IconButton(
+      CupertinoButton(
+        padding: EdgeInsets.zero,
         onPressed: () {
           if (query.isEmpty) {
             close(context, null);
@@ -441,7 +440,7 @@ class AccessControlSearchDelegate extends SearchDelegate {
           }
           query = '';
         },
-        icon: const Icon(Icons.clear),
+        child: const Icon(CupertinoIcons.clear),
       ),
       const SizedBox(
         width: 8,
@@ -451,11 +450,12 @@ class AccessControlSearchDelegate extends SearchDelegate {
 
   @override
   Widget? buildLeading(BuildContext context) {
-    return IconButton(
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
       onPressed: () {
         close(context, null);
       },
-      icon: const Icon(Icons.arrow_back),
+      child: const Icon(CupertinoIcons.back),
     );
   }
 
@@ -558,8 +558,8 @@ class AccessControlPanel extends ConsumerStatefulWidget {
 class _AccessControlPanelState extends ConsumerState<AccessControlPanel> {
   IconData _getIconWithAccessControlMode(AccessControlMode mode) {
     return switch (mode) {
-      AccessControlMode.acceptSelected => Icons.adjust_outlined,
-      AccessControlMode.rejectSelected => Icons.block_outlined,
+      AccessControlMode.acceptSelected => CupertinoIcons.circle,
+      AccessControlMode.rejectSelected => CupertinoIcons.nosign,
     };
   }
 
@@ -580,9 +580,9 @@ class _AccessControlPanelState extends ConsumerState<AccessControlPanel> {
 
   IconData _getIconWithProxiesSortType(AccessSortType type) {
     return switch (type) {
-      AccessSortType.none => Icons.sort,
-      AccessSortType.name => Icons.sort_by_alpha,
-      AccessSortType.time => Icons.timeline,
+      AccessSortType.none => CupertinoIcons.sort_down,
+      AccessSortType.name => CupertinoIcons.textformat_abc,
+      AccessSortType.time => CupertinoIcons.time,
     };
   }
 
@@ -760,19 +760,19 @@ class _AccessControlPanelState extends ConsumerState<AccessControlPanel> {
             spacing: 16,
             children: [
               CommonChip(
-                avatar: const Icon(Icons.auto_awesome),
+                avatar: const Icon(CupertinoIcons.wand_stars),
                 label: appLocalizations.intelligentSelected,
                 onPressed: () {
                   Navigator.of(context).pop(1);
                 },
               ),
               CommonChip(
-                avatar: const Icon(Icons.paste),
+                avatar: const Icon(CupertinoIcons.doc_on_clipboard),
                 label: appLocalizations.clipboardImport,
                 onPressed: _pasteToClipboard,
               ),
               CommonChip(
-                avatar: const Icon(Icons.content_copy),
+                avatar: const Icon(CupertinoIcons.doc_on_doc),
                 label: appLocalizations.clipboardExport,
                 onPressed: _copyToClipboard,
               )

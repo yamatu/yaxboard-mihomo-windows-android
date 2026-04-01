@@ -24,7 +24,7 @@ val isRelease = mStoreFile.exists()
 
 android {
     namespace = "com.follow.clash"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = "28.0.13004108"
 
     compileOptions {
@@ -66,7 +66,11 @@ android {
             isDebuggable = false
 
             // 强制使用 debug 签名，不使用 release 签名
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (isRelease) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
 
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

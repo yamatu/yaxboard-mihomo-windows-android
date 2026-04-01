@@ -1,17 +1,15 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fl_clash/xboard/features/auth/auth.dart';
-import 'package:fl_clash/xboard/services/services.dart';
-import 'package:fl_clash/xboard/features/profile/providers/profile_import_provider.dart';
-import 'package:fl_clash/xboard/core/core.dart';
-import 'package:fl_clash/xboard/domain/domain.dart';
-import 'package:fl_clash/xboard/infrastructure/providers/repository_providers.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
+import 'package:fl_clash/xboard/core/core.dart';
+import 'package:fl_clash/xboard/domain/domain.dart';
+import 'package:fl_clash/xboard/features/auth/auth.dart';
+import 'package:fl_clash/xboard/features/profile/providers/profile_import_provider.dart';
+import 'package:fl_clash/xboard/infrastructure/providers/repository_providers.dart';
+import 'package:fl_clash/xboard/services/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-// 初始化文件级日志器
 final _logger = FileLogger('xboard_user_provider.dart');
 
-// 使用领域模型
 final userInfoProvider = StateProvider<DomainUser?>((ref) => null);
 final subscriptionInfoProvider =
     StateProvider<DomainSubscription?>((ref) => null);
@@ -20,127 +18,193 @@ final userUIStateProvider = StateProvider<UIState>((ref) => const UIState());
 class XBoardUserAuthNotifier extends Notifier<UserAuthState> {
   late final XBoardStorageService _storageService;
 
-  Future<void> _disconnectProxyBeforeSubscriptionRefresh(String tag) async {
-    try {
-      // Only matters when core is running.
-      final isStart = ref.read(runTimeProvider) != null;
-      if (!isStart) return;
-
-      if (!globalState.isInit) return;
-
-      _logger.warning('[$tag] 核心正在运行，刷新订阅前先断开代理/TUN，避免崩溃');
-      await globalState.appController.updateStatus(false);
-
-      // Give proxy plugin/VPN service a moment to settle.
-      await Future.delayed(const Duration(milliseconds: 400));
-    } catch (e, st) {
-      _logger.error('[$tag] 刷新订阅前断开代理失败（忽略继续）', e, st);
-    }
-  }
-
   @override
   UserAuthState build() {
     _storageService = ref.read(storageServiceProvider);
     return const UserAuthState();
   }
 
-  Future<bool> quickAuth() async {
+  Future<void> _disconnectProxyBeforeSubscriptionRefresh(String tag) async {
     try {
-      _logger.info('快速认证检查：检查登录状态...');
+      final isCoreRunning = ref.read(runTimeProvider) != null;
+      if (!isCoreRunning || !globalState.isInit) {
+        return;
+      }
+
+      _logger.warning(
+        '[$tag] core is running, disabling proxy before subscription refresh',
+      );
+      await globalState.appController.updateStatus(false);
+      await Future.delayed(const Duration(milliseconds: 400));
+    } catch (e, st) {
+      _logger.error(
+        '[$tag] failed to disable proxy before subscription refresh',
+        e,
+        st,
+      );
+    }
+  }
+
+  Future<bool> _importSubscriptionAndWait(
+    String? subscribeUrl, {
+    required String tag,
+    bool forceRefresh = false,
+  }) async {
+    final url = subscribeUrl?.trim() ?? '';
+    if (url.isEmpty) {
+      _logger.info('[$tag] subscription url is empty, skip import');
+      return true;
+    }
+
+    _logger.info('[$tag] importing subscription: $url');
+    final success =
+        await ref.read(profileImportProvider.notifier).importSubscription(
+              url,
+              forceRefresh: forceRefresh,
+            );
+
+    if (success) {
+      _logger.info('[$tag] subscription import completed');
+    } else {
+      _logger.warning('[$tag] subscription import failed');
+    }
+    return success;
+  }
+
+  Future<void> _loadCachedAuthData() async {
+    try {
+      final userInfoResult = await _storageService
+          .getDomainUser()
+          .timeout(const Duration(seconds: 2));
+      final userInfo = userInfoResult.dataOrNull;
+      if (userInfo != null) {
+        ref.read(userInfoProvider.notifier).state = userInfo;
+      }
+
+      final subscriptionInfoResult = await _storageService
+          .getDomainSubscription()
+          .timeout(const Duration(seconds: 2));
+      final subscriptionInfo = subscriptionInfoResult.dataOrNull;
+      if (subscriptionInfo != null) {
+        ref.read(subscriptionInfoProvider.notifier).state = subscriptionInfo;
+      }
+    } catch (e) {
+      _logger.info('failed to read cached auth data: $e');
+    }
+  }
+
+  Future<bool> quickAuth() async {
+    state = UserAuthState(
+      isAuthenticated: false,
+      isInitialized: false,
+      email: state.email,
+      isLoading: true,
+      userInfo: state.userInfo,
+      subscriptionInfo: state.subscriptionInfo,
+    );
+
+    try {
+      _logger.info('starting quick auth');
       final authRepo = ref.read(authRepositoryProvider);
       final hasToken = await authRepo
           .isLoggedIn()
-          .timeout(const Duration(seconds: 5), onTimeout: () {
-        _logger.info('快速认证超时，假设无token');
-        return false;
-      });
+          .timeout(const Duration(seconds: 5), onTimeout: () => false);
 
-      if (hasToken) {
-        String? email;
-        DomainUser? userInfo;
-        DomainSubscription? subscriptionInfo;
-        try {
-          final emailResult = await _storageService
-              .getUserEmail()
-              .timeout(const Duration(seconds: 2));
-          email = emailResult.dataOrNull;
-
-          final userInfoResult = await _storageService
-              .getDomainUser()
-              .timeout(const Duration(seconds: 2));
-          userInfo = userInfoResult.dataOrNull;
-
-          final subscriptionInfoResult = await _storageService
-              .getDomainSubscription()
-              .timeout(const Duration(seconds: 2));
-          subscriptionInfo = subscriptionInfoResult.dataOrNull;
-        } catch (e) {
-          _logger.info('获取缓存数据失败，但继续进行认证: $e');
-        }
-
-        state = state.copyWith(
-          isAuthenticated: true,
+      if (!hasToken) {
+        _logger.info('quick auth found no token');
+        state = const UserAuthState(
           isInitialized: true,
-          email: email,
-          userInfo: userInfo,
-          subscriptionInfo: subscriptionInfo,
+          isLoading: false,
         );
-
-        if (userInfo != null) {
-          ref.read(userInfoProvider.notifier).state = userInfo;
-        }
-        if (subscriptionInfo != null) {
-          ref.read(subscriptionInfoProvider.notifier).state = subscriptionInfo;
-        }
-
-        _logger.info(
-            '快速认证成功：已有token，直接进入主界面. isInitialized: ${state.isInitialized}');
-        _backgroundTokenValidation();
-
-        // 启动时自动导入订阅
-        if (subscriptionInfo?.subscribeUrl.isNotEmpty == true) {
-          _logger.info('启动时自动导入订阅: ${subscriptionInfo!.subscribeUrl}');
-          ref
-              .read(profileImportProvider.notifier)
-              .importSubscription(subscriptionInfo.subscribeUrl);
-        }
-
-        return true;
-      } else {
-        _logger.info(
-            '快速认证：无本地token，显示登录页面. isInitialized: ${state.isInitialized}');
-        state = state.copyWith(isInitialized: true);
         return false;
       }
+
+      String? email;
+      try {
+        final emailResult = await _storageService
+            .getUserEmail()
+            .timeout(const Duration(seconds: 2));
+        email = emailResult.dataOrNull;
+      } catch (e) {
+        _logger.info('failed to read cached email during quick auth: $e');
+      }
+
+      await _loadCachedAuthData();
+      final cachedSubscription = ref.read(subscriptionInfoProvider);
+      final importSuccess = await _importSubscriptionAndWait(
+        cachedSubscription?.subscribeUrl,
+        tag: 'quick-auth',
+      );
+
+      if (!importSuccess &&
+          (cachedSubscription?.subscribeUrl.isNotEmpty == true)) {
+        state = UserAuthState(
+          isAuthenticated: false,
+          isInitialized: true,
+          email: email,
+          isLoading: false,
+          errorMessage: 'Subscription import failed. Please sign in again.',
+          userInfo: ref.read(userInfoProvider),
+          subscriptionInfo: cachedSubscription,
+        );
+        return false;
+      }
+
+      state = UserAuthState(
+        isAuthenticated: true,
+        isInitialized: true,
+        email: email,
+        isLoading: false,
+        userInfo: ref.read(userInfoProvider),
+        subscriptionInfo: ref.read(subscriptionInfoProvider),
+      );
+      _logger.info('quick auth completed');
+      _backgroundTokenValidation();
+      return true;
     } catch (e) {
-      _logger.info('快速认证失败: $e');
-      state = state.copyWith(isInitialized: true);
-      _logger.info('快速认证失败: $e. isInitialized: ${state.isInitialized}');
+      _logger.info('quick auth failed: $e');
+      state = UserAuthState(
+        isAuthenticated: false,
+        isInitialized: true,
+        email: state.email,
+        isLoading: false,
+        errorMessage: 'Auto sign-in check failed. Please sign in manually.',
+        userInfo: state.userInfo,
+        subscriptionInfo: state.subscriptionInfo,
+      );
       return false;
     } finally {
-      if (!state.isInitialized) {
-        _logger.info('强制设置初始化状态为true. isInitialized: ${state.isInitialized}');
-        state = state.copyWith(isInitialized: true);
+      if (!state.isInitialized || state.isLoading) {
+        state = UserAuthState(
+          isAuthenticated: state.isAuthenticated,
+          isInitialized: true,
+          email: state.email,
+          isLoading: false,
+          errorMessage: state.errorMessage,
+          userInfo: state.userInfo,
+          subscriptionInfo: state.subscriptionInfo,
+        );
       }
     }
   }
 
   void _backgroundTokenValidation() {
-    Future.delayed(const Duration(milliseconds: 1000), () async {
+    Future.delayed(const Duration(seconds: 1), () async {
       try {
-        _logger.info('后台验证token有效性...');
+        _logger.info('validating token in background');
         final userRepo = ref.read(userRepositoryProvider);
         final result = await userRepo.validateToken();
 
         if (result.isFailure || result.dataOrNull == false) {
-          _logger.info('Token验证失败，显示登录过期提示');
+          _logger.info('token validation failed');
           _showTokenExpiredDialog();
-        } else {
-          _logger.info('Token验证成功，静默更新用户数据');
-          _silentUpdateUserData();
+          return;
         }
+
+        _logger.info('token validation passed');
+        await _silentUpdateUserData();
       } catch (e) {
-        _logger.info('后台token验证异常: $e');
+        _logger.info('background token validation failed: $e');
       }
     });
   }
@@ -150,46 +214,50 @@ class XBoardUserAuthNotifier extends Notifier<UserAuthState> {
       final userRepo = ref.read(userRepositoryProvider);
       final subscriptionRepo = ref.read(subscriptionRepositoryProvider);
 
-      // 获取订阅信息
-      final subscriptionResult = await subscriptionRepo.getSubscription();
-      final subscriptionData = subscriptionResult.dataOrNull;
-
-      // 获取用户信息
       try {
         final userInfoResult = await userRepo.getUserInfo();
         final userInfoData = userInfoResult.dataOrNull;
         if (userInfoData != null) {
           await _storageService.saveDomainUser(userInfoData);
           ref.read(userInfoProvider.notifier).state = userInfoData;
+          state = state.copyWith(userInfo: userInfoData);
         }
       } catch (e) {
-        _logger.info('静默更新用户信息失败: $e');
+        _logger.info('silent user info refresh failed: $e');
       }
 
-      if (subscriptionData != null) {
-        await _storageService.saveDomainSubscription(subscriptionData);
-        ref.read(subscriptionInfoProvider.notifier).state = subscriptionData;
-
-        if (subscriptionData.subscribeUrl.isNotEmpty) {
-          _logger.info('[后台验证] 开始自动导入订阅配置: ${subscriptionData.subscribeUrl}');
-          ref
-              .read(profileImportProvider.notifier)
-              .importSubscription(subscriptionData.subscribeUrl);
-        } else {
-          _logger.info('[后台验证] 订阅URL为空，跳过配置导入');
-        }
+      final currentSubscription = ref.read(subscriptionInfoProvider);
+      final subscriptionResult = await subscriptionRepo.getSubscription();
+      final subscriptionData = subscriptionResult.dataOrNull;
+      if (subscriptionData == null) {
+        return;
       }
 
-      _logger.info('静默更新用户数据完成');
+      await _storageService.saveDomainSubscription(subscriptionData);
+      ref.read(subscriptionInfoProvider.notifier).state = subscriptionData;
+      state = state.copyWith(subscriptionInfo: subscriptionData);
+
+      final subscriptionUrl = subscriptionData.subscribeUrl.trim();
+      final shouldImport = subscriptionUrl.isNotEmpty &&
+          currentSubscription?.subscribeUrl.trim() != subscriptionUrl &&
+          !ref.read(profileImportProvider).isImporting;
+
+      if (shouldImport) {
+        _logger.info(
+            'subscription changed after token validation, refreshing import');
+        await _importSubscriptionAndWait(
+          subscriptionUrl,
+          tag: 'background-refresh',
+          forceRefresh: true,
+        );
+      }
     } catch (e) {
-      _logger.info('静默更新用户数据失败: $e');
+      _logger.info('silent user data refresh failed: $e');
     }
   }
 
   void _showTokenExpiredDialog() {
-    state = state.copyWith(
-      errorMessage: 'TOKEN_EXPIRED', // 特殊标记，UI层检测到后显示对话框
-    );
+    state = state.copyWith(errorMessage: 'TOKEN_EXPIRED');
   }
 
   void clearTokenExpiredError() {
@@ -199,100 +267,85 @@ class XBoardUserAuthNotifier extends Notifier<UserAuthState> {
   }
 
   Future<void> handleTokenExpired() async {
-    _logger.info('处理token过期，清除认证状态');
+    _logger.info('handling expired token');
     final authRepo = ref.read(authRepositoryProvider);
     await authRepo.logout();
     state = const UserAuthState(isInitialized: true);
   }
 
   Future<bool> autoAuth() async {
-    return await quickAuth();
+    return quickAuth();
   }
 
   Future<bool> login(String email, String password) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      _logger.info('开始登录: $email');
+      _logger.info('logging in: $email');
 
       final authRepo = ref.read(authRepositoryProvider);
       final result = await authRepo.login(email: email, password: password);
-
       if (result.isFailure) {
         state = state.copyWith(
           isLoading: false,
-          errorMessage: result.exceptionOrNull?.message ?? '登录失败',
+          errorMessage: result.exceptionOrNull?.message ?? 'Login failed',
         );
         return false;
       }
 
-      _logger.info('登录成功，立即获取用户信息');
       await _storageService.saveUserEmail(email);
 
-      // 获取用户信息和订阅信息
+      DomainUser? userInfo;
+      DomainSubscription? subscriptionInfo;
+
       try {
-        _logger.info('开始获取用户信息...');
         final userRepo = ref.read(userRepositoryProvider);
         final userInfoResult = await userRepo.getUserInfo();
-        final userInfo = userInfoResult.dataOrNull;
-
-        _logger.info('用户信息API调用完成: ${userInfo != null}');
+        userInfo = userInfoResult.dataOrNull;
         if (userInfo != null) {
           ref.read(userInfoProvider.notifier).state = userInfo;
           await _storageService.saveDomainUser(userInfo);
-          _logger.info('用户信息已保存: ${userInfo.email}');
-        } else {
-          _logger.info('警告: getUserInfo返回null');
         }
 
-        _logger.info('开始获取订阅信息...');
         final subscriptionRepo = ref.read(subscriptionRepositoryProvider);
         final subscriptionResult = await subscriptionRepo.getSubscription();
-        final subscriptionInfo = subscriptionResult.dataOrNull;
-
-        _logger.info('订阅信息API调用完成: ${subscriptionInfo != null}');
+        subscriptionInfo = subscriptionResult.dataOrNull;
         if (subscriptionInfo != null) {
           ref.read(subscriptionInfoProvider.notifier).state = subscriptionInfo;
           await _storageService.saveDomainSubscription(subscriptionInfo);
-          _logger
-              .info('订阅信息已保存，subscribeUrl: ${subscriptionInfo.subscribeUrl}');
-
-          // 登录成功后自动导入订阅配置
-          if (subscriptionInfo.subscribeUrl.isNotEmpty) {
-            _logger.info('[登录成功] 开始自动导入订阅配置: ${subscriptionInfo.subscribeUrl}');
-            ref
-                .read(profileImportProvider.notifier)
-                .importSubscription(subscriptionInfo.subscribeUrl);
-          } else {
-            _logger.info('[登录成功] 订阅URL为空，跳过配置导入');
-          }
-        } else {
-          _logger.info('警告: getSubscription返回null');
         }
-      } catch (e, stackTrace) {
-        _logger.info('获取用户/订阅信息失败，但继续登录: $e');
-        _logger.info('错误堆栈: $stackTrace');
+      } catch (e, st) {
+        _logger.info('failed to fetch user info after login: $e');
+        _logger.info('stack trace: $st');
       }
 
-      _logger.info('准备更新状态...');
-      final newState = state.copyWith(
+      final importSuccess = await _importSubscriptionAndWait(
+        subscriptionInfo?.subscribeUrl,
+        tag: 'login',
+        forceRefresh: true,
+      );
+      if (!importSuccess &&
+          (subscriptionInfo?.subscribeUrl.isNotEmpty == true)) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'Subscription import failed. Please retry login.',
+        );
+        return false;
+      }
+
+      state = UserAuthState(
         isAuthenticated: true,
         isInitialized: true,
         email: email,
         isLoading: false,
-        userInfo: ref.read(userInfoProvider),
-        subscriptionInfo: ref.read(subscriptionInfoProvider),
+        userInfo: userInfo ?? ref.read(userInfoProvider),
+        subscriptionInfo:
+            subscriptionInfo ?? ref.read(subscriptionInfoProvider),
       );
-      state = newState;
-      _logger.info('===== 认证状态已更新! =====');
-      _logger.info('isAuthenticated: ${state.isAuthenticated}');
-      _logger.info('isInitialized: ${state.isInitialized}');
-      _logger.info('email: ${state.email}');
-      _logger.info('===========================');
-
+      _logger.info('login completed');
       return true;
     } catch (e) {
-      _logger.info('登录出错: $e');
-      String errorMessage = '登录失败';
+      _logger.info('login failed: $e');
+      var errorMessage = 'Login failed';
       if (e is XBoardException) {
         errorMessage = e.message;
       }
@@ -304,11 +357,15 @@ class XBoardUserAuthNotifier extends Notifier<UserAuthState> {
     }
   }
 
-  Future<bool> register(String email, String password, String? inviteCode,
-      String emailCode) async {
+  Future<bool> register(
+    String email,
+    String password,
+    String? inviteCode,
+    String emailCode,
+  ) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      _logger.info('开始注册: $email');
+      _logger.info('registering: $email');
 
       final authRepo = ref.read(authRepositoryProvider);
       final result = await authRepo.register(
@@ -319,20 +376,18 @@ class XBoardUserAuthNotifier extends Notifier<UserAuthState> {
       );
 
       if (result.isSuccess) {
-        _logger.info('注册成功');
         await _storageService.saveUserEmail(email);
         state = state.copyWith(isLoading: false);
         return true;
-      } else {
-        state = state.copyWith(
-          isLoading: false,
-          errorMessage: result.exceptionOrNull?.message ?? '注册失败',
-        );
-        return false;
       }
+
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: result.exceptionOrNull?.message ?? 'Register failed',
+      );
+      return false;
     } catch (e) {
-      _logger.info('注册出错: $e');
-      String errorMessage = '注册失败';
+      var errorMessage = 'Register failed';
       if (e is XBoardException) {
         errorMessage = e.message;
       }
@@ -347,11 +402,8 @@ class XBoardUserAuthNotifier extends Notifier<UserAuthState> {
   Future<bool> sendVerificationCode(String email) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      _logger.info('发送验证码到: $email');
-      // 域名服务暂时不支持发送验证码功能
-      throw UnimplementedError('发送验证码功能暂时不可用');
+      throw UnimplementedError('Send verification code is not implemented');
     } catch (e) {
-      _logger.info('发送验证码出错: $e');
       state = state.copyWith(
         isLoading: false,
         errorMessage: e.toString(),
@@ -361,11 +413,12 @@ class XBoardUserAuthNotifier extends Notifier<UserAuthState> {
   }
 
   Future<bool> resetPassword(
-      String email, String password, String emailCode) async {
+    String email,
+    String password,
+    String emailCode,
+  ) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      _logger.info('重置密码: $email');
-
       final authRepo = ref.read(authRepositoryProvider);
       final result = await authRepo.resetPassword(
         email: email,
@@ -374,18 +427,17 @@ class XBoardUserAuthNotifier extends Notifier<UserAuthState> {
       );
 
       if (result.isSuccess) {
-        _logger.info('密码重置成功');
         state = state.copyWith(isLoading: false);
         return true;
-      } else {
-        state = state.copyWith(
-          isLoading: false,
-          errorMessage: result.exceptionOrNull?.message ?? '密码重置失败',
-        );
-        return false;
       }
+
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage:
+            result.exceptionOrNull?.message ?? 'Reset password failed',
+      );
+      return false;
     } catch (e) {
-      _logger.info('重置密码出错: $e');
       state = state.copyWith(
         isLoading: false,
         errorMessage: e.toString(),
@@ -399,12 +451,10 @@ class XBoardUserAuthNotifier extends Notifier<UserAuthState> {
       return;
     }
 
-    await _disconnectProxyBeforeSubscriptionRefresh('支付后刷新订阅');
+    await _disconnectProxyBeforeSubscriptionRefresh('payment-refresh');
 
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      _logger.info('刷新订阅信息...');
-
       final userRepo = ref.read(userRepositoryProvider);
       final subscriptionRepo = ref.read(subscriptionRepositoryProvider);
 
@@ -419,7 +469,7 @@ class XBoardUserAuthNotifier extends Notifier<UserAuthState> {
           ref.read(userInfoProvider.notifier).state = userInfo;
         }
       } catch (e) {
-        _logger.info('获取用户详细信息失败: $e');
+        _logger.info('failed to refresh user info after payment: $e');
       }
 
       final subscriptionResult = await subscriptionRepo.getSubscription();
@@ -434,20 +484,15 @@ class XBoardUserAuthNotifier extends Notifier<UserAuthState> {
         subscriptionInfo: subscriptionData,
         isLoading: false,
       );
-      _logger.info('订阅信息已刷新');
 
       if (subscriptionData?.subscribeUrl.isNotEmpty == true) {
-        _logger.info('[支付成功] 开始重新导入订阅配置: ${subscriptionData!.subscribeUrl}');
-        _logger.info('[支付成功] 使用强制刷新模式，跳过重复检测');
-        ref.read(profileImportProvider.notifier).importSubscription(
-              subscriptionData.subscribeUrl,
-              forceRefresh: true,
-            );
-      } else {
-        _logger.info('[支付成功] 订阅链接为空，跳过重新导入');
+        await _importSubscriptionAndWait(
+          subscriptionData!.subscribeUrl,
+          tag: 'payment-refresh',
+          forceRefresh: true,
+        );
       }
     } catch (e) {
-      _logger.info('刷新订阅信息出错: $e');
       state = state.copyWith(
         isLoading: false,
         errorMessage: e.toString(),
@@ -460,12 +505,10 @@ class XBoardUserAuthNotifier extends Notifier<UserAuthState> {
       return;
     }
 
-    await _disconnectProxyBeforeSubscriptionRefresh('手动刷新订阅');
+    await _disconnectProxyBeforeSubscriptionRefresh('manual-refresh');
 
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      _logger.info('刷新订阅信息...');
-
       final userRepo = ref.read(userRepositoryProvider);
       final subscriptionRepo = ref.read(subscriptionRepositoryProvider);
 
@@ -480,7 +523,7 @@ class XBoardUserAuthNotifier extends Notifier<UserAuthState> {
           ref.read(userInfoProvider.notifier).state = userInfo;
         }
       } catch (e) {
-        _logger.info('获取用户详细信息失败: $e');
+        _logger.info('failed to refresh user info: $e');
       }
 
       final subscriptionResult = await subscriptionRepo.getSubscription();
@@ -495,21 +538,15 @@ class XBoardUserAuthNotifier extends Notifier<UserAuthState> {
         subscriptionInfo: subscriptionData,
         isLoading: false,
       );
-      _logger.info('订阅信息已刷新');
 
-      // 触发订阅导入流程
       if (subscriptionData?.subscribeUrl.isNotEmpty == true) {
-        _logger.info('[手动刷新] 开始导入订阅配置: ${subscriptionData!.subscribeUrl}');
-        _logger.info('[手动刷新] 使用强制刷新模式，跳过重复检测');
-        ref.read(profileImportProvider.notifier).importSubscription(
-              subscriptionData.subscribeUrl,
-              forceRefresh: true,
-            );
-      } else {
-        _logger.info('[手动刷新] 订阅链接为空，跳过导入');
+        await _importSubscriptionAndWait(
+          subscriptionData!.subscribeUrl,
+          tag: 'manual-refresh',
+          forceRefresh: true,
+        );
       }
     } catch (e) {
-      _logger.info('刷新订阅信息出错: $e');
       state = state.copyWith(
         isLoading: false,
         errorMessage: e.toString(),
@@ -521,9 +558,8 @@ class XBoardUserAuthNotifier extends Notifier<UserAuthState> {
     if (!state.isAuthenticated) {
       return;
     }
-    try {
-      _logger.info('刷新用户详细信息...');
 
+    try {
       final userRepo = ref.read(userRepositoryProvider);
       final userInfoResult = await userRepo.getUserInfo();
       final userInfoData = userInfoResult.dataOrNull;
@@ -532,26 +568,23 @@ class XBoardUserAuthNotifier extends Notifier<UserAuthState> {
         await _storageService.saveDomainUser(userInfoData);
         ref.read(userInfoProvider.notifier).state = userInfoData;
         state = state.copyWith(userInfo: userInfoData);
-        _logger.info('用户详细信息已刷新');
       }
     } catch (e) {
-      _logger.info('刷新用户详细信息出错: $e');
+      _logger.info('failed to refresh user info: $e');
     }
   }
 
   Future<void> logout() async {
-    _logger.info('用户登出');
-
     final authRepo = ref.read(authRepositoryProvider);
     await authRepo.logout();
     await _storageService.clearAuthData();
 
-    state = const UserAuthState(
-      isInitialized: true, // 登出后保持初始化状态，只重置认证信息
-    );
+    ref.read(userInfoProvider.notifier).state = null;
+    ref.read(subscriptionInfoProvider.notifier).state = null;
+    state = const UserAuthState(isInitialized: true);
   }
 
-  String? get currentAuthToken => null; // Token管理已委托给域名服务
+  String? get currentAuthToken => null;
   bool get isAuthenticated => state.isAuthenticated;
   String? get currentEmail => state.email;
 }

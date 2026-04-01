@@ -1,14 +1,16 @@
 /// 配置设置
-/// 
+///
 /// 包含模块的各种配置参数
 class ConfigSettings {
   final String currentProvider;
+  final BootstrapConfigSettings bootstrapConfig;
   final RemoteConfigSettings remoteConfig;
   final SubscriptionSettings subscription;
   final LogSettings log;
 
   const ConfigSettings({
     this.currentProvider = 'Flclash',
+    this.bootstrapConfig = const BootstrapConfigSettings(),
     this.remoteConfig = const RemoteConfigSettings(),
     this.subscription = const SubscriptionSettings(),
     this.log = const LogSettings(),
@@ -18,15 +20,14 @@ class ConfigSettings {
   factory ConfigSettings.fromJson(Map<String, dynamic> json) {
     return ConfigSettings(
       currentProvider: json['currentProvider'] as String? ?? 'Flclash',
+      bootstrapConfig: BootstrapConfigSettings.fromJson(
+        json['bootstrapConfig'] as Map<String, dynamic>? ?? {},
+      ),
       remoteConfig: RemoteConfigSettings.fromJson(
-        json['remoteConfig'] as Map<String, dynamic>? ?? {}
-      ),
+          json['remoteConfig'] as Map<String, dynamic>? ?? {}),
       subscription: SubscriptionSettings.fromJson(
-        json['subscription'] as Map<String, dynamic>? ?? {}
-      ),
-      log: LogSettings.fromJson(
-        json['log'] as Map<String, dynamic>? ?? {}
-      ),
+          json['subscription'] as Map<String, dynamic>? ?? {}),
+      log: LogSettings.fromJson(json['log'] as Map<String, dynamic>? ?? {}),
     );
   }
 
@@ -34,6 +35,7 @@ class ConfigSettings {
   Map<String, dynamic> toJson() {
     return {
       'currentProvider': currentProvider,
+      'bootstrapConfig': bootstrapConfig.toJson(),
       'remoteConfig': remoteConfig.toJson(),
       'subscription': subscription.toJson(),
       'log': log.toJson(),
@@ -44,7 +46,10 @@ class ConfigSettings {
   bool validate() {
     // 移除 provider 硬编码限制，允许使用任意 provider
     // 只要远程配置 JSON 中有对应的键名即可
-    return remoteConfig.validate() && subscription.validate() && log.validate();
+    return bootstrapConfig.getValidationErrors().isEmpty &&
+        remoteConfig.validate() &&
+        subscription.validate() &&
+        log.validate();
   }
 
   /// 获取验证错误
@@ -54,6 +59,7 @@ class ConfigSettings {
     // 移除 provider 硬编码限制
     // provider 仅作为 key 从远程配置的 panels 对象中选择数据
 
+    errors.addAll(bootstrapConfig.getValidationErrors());
     errors.addAll(remoteConfig.getValidationErrors());
     errors.addAll(subscription.getValidationErrors());
     errors.addAll(log.getValidationErrors());
@@ -64,6 +70,68 @@ class ConfigSettings {
   @override
   String toString() {
     return 'ConfigSettings(provider: $currentProvider, subscription: $subscription)';
+  }
+}
+
+class BootstrapConfigSettings {
+  final String? remoteUrl;
+  final Map<String, String> headers;
+  final Duration timeout;
+  final bool cacheRemoteToDisk;
+
+  const BootstrapConfigSettings({
+    this.remoteUrl,
+    this.headers = const {},
+    this.timeout = const Duration(seconds: 15),
+    this.cacheRemoteToDisk = true,
+  });
+
+  factory BootstrapConfigSettings.fromJson(Map<String, dynamic> json) {
+    final headersData = json['headers'] as Map<String, dynamic>?;
+    final timeoutSeconds =
+        json['timeoutSeconds'] as int? ?? json['timeout_seconds'] as int?;
+
+    return BootstrapConfigSettings(
+      remoteUrl: json['remoteUrl'] as String? ?? json['remote_url'] as String?,
+      headers: headersData?.map(
+            (key, value) => MapEntry(key, value.toString()),
+          ) ??
+          const {},
+      timeout: Duration(seconds: timeoutSeconds ?? 15),
+      cacheRemoteToDisk: json['cacheRemoteToDisk'] as bool? ??
+          json['cache_remote_to_disk'] as bool? ??
+          true,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (remoteUrl != null) 'remoteUrl': remoteUrl,
+      if (headers.isNotEmpty) 'headers': headers,
+      'timeoutSeconds': timeout.inSeconds,
+      'cacheRemoteToDisk': cacheRemoteToDisk,
+    };
+  }
+
+  List<String> getValidationErrors() {
+    final errors = <String>[];
+
+    if (remoteUrl != null && remoteUrl!.trim().isNotEmpty) {
+      try {
+        final uri = Uri.parse(remoteUrl!.trim());
+        if (!uri.hasScheme || uri.host.isEmpty) {
+          errors.add('Invalid bootstrap remote URL format: $remoteUrl');
+        }
+      } catch (_) {
+        errors.add('Invalid bootstrap remote URL: $remoteUrl');
+      }
+    }
+
+    if (timeout.inSeconds <= 0) {
+      errors.add('Bootstrap timeout must be greater than 0');
+    }
+
+    return errors;
   }
 }
 
@@ -84,7 +152,8 @@ class RemoteConfigSettings {
   factory RemoteConfigSettings.fromJson(Map<String, dynamic> json) {
     final sourcesList = json['sources'] as List<dynamic>? ?? [];
     final sources = sourcesList
-        .map((item) => RemoteSourceConfig.fromJson(item as Map<String, dynamic>))
+        .map(
+            (item) => RemoteSourceConfig.fromJson(item as Map<String, dynamic>))
         .toList();
 
     return RemoteConfigSettings(
@@ -108,9 +177,7 @@ class RemoteConfigSettings {
     // 远程配置源允许为空:
     // - 对于纯本地配置场景, 可以完全依赖打包内置的 config.json / remote.config.json
     // - 当 sources 为空时, RemoteConfigManager 会优先使用默认/本地配置源
-    return maxRetries > 0 && 
-           timeout.inSeconds > 0 && 
-           retryDelay.inSeconds >= 0;
+    return maxRetries > 0 && timeout.inSeconds > 0 && retryDelay.inSeconds >= 0;
   }
 
   List<String> getValidationErrors() {
@@ -157,7 +224,8 @@ class RemoteSourceConfig {
       name: json['name'] as String? ?? '',
       url: json['url'] as String? ?? '',
       headers: headersData?.cast<String, String>(),
-      timeout: timeoutSeconds != null ? Duration(seconds: timeoutSeconds) : null,
+      timeout:
+          timeoutSeconds != null ? Duration(seconds: timeoutSeconds) : null,
       encryptionKey: json['encryptionKey'] as String?,
     );
   }
@@ -209,7 +277,9 @@ class SubscriptionSettings {
 
   factory SubscriptionSettings.fromJson(Map<String, dynamic> json) {
     return SubscriptionSettings(
-      preferEncrypt: json['preferEncrypt'] as bool? ?? json['prefer_encrypt'] as bool? ?? false,
+      preferEncrypt: json['preferEncrypt'] as bool? ??
+          json['prefer_encrypt'] as bool? ??
+          false,
     );
   }
 

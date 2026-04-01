@@ -376,6 +376,12 @@ enum DashboardWidget {
     ),
     platforms: desktopPlatforms,
   ),
+  ipv6Button(
+    GridItem(
+      crossAxisCellCount: 4,
+      child: IPv6Button(),
+    ),
+  ),
   intranetIp(
     GridItem(
       crossAxisCellCount: 4,

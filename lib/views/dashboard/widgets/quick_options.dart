@@ -4,6 +4,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/views/config/network.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -37,7 +38,7 @@ class TUNButton extends StatelessWidget {
         },
         info: Info(
           label: appLocalizations.tun,
-          iconData: Icons.stacked_line_chart,
+          iconData: CupertinoIcons.chart_bar_alt_fill,
         ),
         child: Container(
           padding: baseInfoEdgeInsets.copyWith(
@@ -56,11 +57,11 @@ class TUNButton extends StatelessWidget {
                     appLocalizations.options,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleSmall
-                        ?.adjustSize(-2)
-                        .toLight,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w300,
+                      color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
+                    ),
                   ),
                 ),
               ),
@@ -68,7 +69,7 @@ class TUNButton extends StatelessWidget {
                 builder: (_, ref, __) {
                   final enable = ref.watch(patchClashConfigProvider
                       .select((state) => state.tun.enable));
-                  return Switch(
+                  return CupertinoSwitch(
                     value: enable,
                     onChanged: (value) {
                       ref.read(patchClashConfigProvider.notifier).updateState(
@@ -117,7 +118,7 @@ class SystemProxyButton extends StatelessWidget {
         },
         info: Info(
           label: appLocalizations.systemProxy,
-          iconData: Icons.shuffle,
+          iconData: CupertinoIcons.shuffle,
         ),
         child: Container(
           padding: baseInfoEdgeInsets.copyWith(
@@ -136,11 +137,11 @@ class SystemProxyButton extends StatelessWidget {
                     appLocalizations.options,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleSmall
-                        ?.adjustSize(-2)
-                        .toLight,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w300,
+                      color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
+                    ),
                   ),
                 ),
               ),
@@ -148,8 +149,7 @@ class SystemProxyButton extends StatelessWidget {
                 builder: (_, ref, __) {
                   final systemProxy = ref.watch(networkSettingProvider
                       .select((state) => state.systemProxy));
-                  return Switch(
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  return CupertinoSwitch(
                     value: systemProxy,
                     onChanged: (value) {
                       ref.read(networkSettingProvider.notifier).updateState(
@@ -199,7 +199,7 @@ class VpnButton extends StatelessWidget {
         },
         info: Info(
           label: "VPN",
-          iconData: Icons.stacked_line_chart,
+          iconData: CupertinoIcons.chart_bar_alt_fill,
         ),
         child: Container(
           padding: baseInfoEdgeInsets.copyWith(
@@ -218,11 +218,11 @@ class VpnButton extends StatelessWidget {
                     appLocalizations.options,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleSmall
-                        ?.adjustSize(-2)
-                        .toLight,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w300,
+                      color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
+                    ),
                   ),
                 ),
               ),
@@ -233,7 +233,7 @@ class VpnButton extends StatelessWidget {
                       (state) => state.enable,
                     ),
                   );
-                  return Switch(
+                  return CupertinoSwitch(
                     value: enable,
                     onChanged: (value) {
                       ref.read(vpnSettingProvider.notifier).updateState(
@@ -248,6 +248,137 @@ class VpnButton extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class IPv6Button extends StatelessWidget {
+  const IPv6Button({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: getWidgetHeight(1),
+      child: CommonCard(
+        onPressed: () {
+          showSheet(
+            context: context,
+            builder: (_, type) {
+              return AdaptiveSheetScaffold(
+                type: type,
+                body: generateListView(
+                  generateSection(
+                    items: [
+                      const _IPv6ConfigItem(),
+                    ],
+                  ),
+                ),
+                title: "IPv6",
+              );
+            },
+          );
+        },
+        info: const Info(
+          label: "IPv6",
+          iconData: CupertinoIcons.globe,
+        ),
+        child: Container(
+          padding: baseInfoEdgeInsets.copyWith(
+            top: 4,
+            bottom: 8,
+            right: 8,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.max,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                flex: 1,
+                child: TooltipText(
+                  text: Text(
+                    appLocalizations.options,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w300,
+                      color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
+                    ),
+                  ),
+                ),
+              ),
+              Consumer(
+                builder: (_, ref, __) {
+                  final ipv6 = system.isDesktop
+                      ? ref.watch(
+                          patchClashConfigProvider.select((state) => state.ipv6),
+                        )
+                      : ref.watch(
+                          patchClashConfigProvider.select(
+                            (state) => state.ipv6,
+                          ),
+                        ) &&
+                          ref.watch(
+                            vpnSettingProvider.select((state) => state.ipv6),
+                          );
+                  return CupertinoSwitch(
+                    value: ipv6,
+                    onChanged: (value) {
+                      _updateIpv6Setting(ref, value);
+                    },
+                  );
+                },
+              )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+void _updateIpv6Setting(WidgetRef ref, bool value) {
+  ref.read(patchClashConfigProvider.notifier).updateState(
+        (state) => state.copyWith(
+          ipv6: value,
+        ),
+      );
+  if (!system.isDesktop) {
+    ref.read(vpnSettingProvider.notifier).updateState(
+          (state) => state.copyWith(
+            ipv6: value,
+          ),
+        );
+  }
+}
+
+class _IPv6ConfigItem extends ConsumerWidget {
+  const _IPv6ConfigItem();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ipv6 = system.isDesktop
+        ? ref.watch(
+            patchClashConfigProvider.select((state) => state.ipv6),
+          )
+        : ref.watch(
+            patchClashConfigProvider.select((state) => state.ipv6),
+          ) &&
+            ref.watch(
+              vpnSettingProvider.select((state) => state.ipv6),
+            );
+    final subtitle = system.isDesktop
+        ? appLocalizations.ipv6Desc
+        : "${appLocalizations.ipv6Desc}\n${appLocalizations.ipv6InboundDesc}";
+    return ListItem.switchItem(
+      title: const Text("IPv6"),
+      subtitle: Text(subtitle),
+      delegate: SwitchDelegate(
+        value: ipv6,
+        onChanged: (value) async {
+          _updateIpv6Setting(ref, value);
+        },
       ),
     );
   }

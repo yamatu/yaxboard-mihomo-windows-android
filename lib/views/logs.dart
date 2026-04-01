@@ -4,6 +4,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -69,12 +70,13 @@ class _LogsViewState extends ConsumerState<LogsView> with PageMixin {
 
   @override
   List<Widget> get actions => [
-        IconButton(
+        CupertinoButton(
+          padding: EdgeInsets.zero,
           onPressed: () {
             _handleExport();
           },
-          icon: const Icon(
-            Icons.file_download_outlined,
+          child: const Icon(
+            CupertinoIcons.arrow_down_doc,
           ),
         ),
       ];
@@ -254,7 +256,7 @@ class _LogsViewState extends ConsumerState<LogsView> with PageMixin {
             return FadeBox(
               child: state.loading
                   ? Center(
-                      child: CircularProgressIndicator(),
+                      child: CupertinoActivityIndicator(),
                     )
                   : content,
             );

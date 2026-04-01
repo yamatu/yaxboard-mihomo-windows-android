@@ -1,5 +1,6 @@
 import 'package:fl_clash/common/color.dart';
 import 'package:fl_clash/enum/enum.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class CommonChip extends StatelessWidget {
@@ -18,34 +19,55 @@ class CommonChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (type == ChipType.delete) {
-      return Chip(
-        avatar: avatar,
-        labelPadding: const EdgeInsets.symmetric(
-          vertical: 0,
-          horizontal: 4,
+    final secondaryLabel = CupertinoDynamicColor.resolve(
+      CupertinoColors.secondaryLabel,
+      context,
+    );
+    final separator = CupertinoDynamicColor.resolve(
+      CupertinoColors.separator,
+      context,
+    );
+
+    return GestureDetector(
+      onTap: type == ChipType.delete ? null : onPressed,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: separator, width: 0.5),
+          color: CupertinoDynamicColor.resolve(
+            CupertinoColors.tertiarySystemFill,
+            context,
+          ),
         ),
-        clipBehavior: Clip.antiAlias,
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        onDeleted: onPressed ?? () {},
-        side:
-            BorderSide(color: Theme.of(context).dividerColor.opacity15),
-        labelStyle: Theme.of(context).textTheme.bodyMedium,
-        label: Text(label),
-      );
-    }
-    return ActionChip(
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      avatar: avatar,
-      clipBehavior: Clip.antiAlias,
-      labelPadding: const EdgeInsets.symmetric(
-        vertical: 0,
-        horizontal: 4,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (avatar != null) ...[
+              avatar!,
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                color: secondaryLabel,
+              ),
+            ),
+            if (type == ChipType.delete) ...[
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: onPressed,
+                child: Icon(
+                  CupertinoIcons.xmark_circle_fill,
+                  size: 16,
+                  color: secondaryLabel,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
-      onPressed: onPressed ?? () {},
-      side: BorderSide(color: Theme.of(context).dividerColor.opacity15),
-      labelStyle: Theme.of(context).textTheme.bodyMedium,
-      label: Text(label),
     );
   }
 }

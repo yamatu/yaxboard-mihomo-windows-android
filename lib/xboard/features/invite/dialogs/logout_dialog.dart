@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:fl_clash/xboard/utils/xboard_notification.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_clash/common/common.dart';
@@ -9,22 +9,20 @@ class LogoutDialog extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return AlertDialog(
+    return CupertinoAlertDialog(
       title: Text(appLocalizations.confirmLogout),
       content: Text(appLocalizations.logoutConfirmMsg),
       actions: [
-        TextButton(
+        CupertinoDialogAction(
           onPressed: () => Navigator.of(context).pop(),
           child: Text(appLocalizations.cancel),
         ),
-        TextButton(
+        CupertinoDialogAction(
+          isDestructiveAction: true,
           onPressed: () async {
             Navigator.of(context).pop();
             await _performLogout(context, ref);
           },
-          style: TextButton.styleFrom(
-            foregroundColor: Colors.red,
-          ),
           child: Text(appLocalizations.logout),
         ),
       ],

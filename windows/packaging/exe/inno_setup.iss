@@ -19,8 +19,8 @@ SolidCompression=yes
 SetupIconFile={{SETUP_ICON_FILE}}
 WizardStyle=modern
 PrivilegesRequired={{PRIVILEGES_REQUIRED}}
-ArchitecturesAllowed={{ARCH}}
-ArchitecturesInstallIn64BitMode={{ARCH}}
+ArchitecturesAllowed={% if ARCH == 'x64' %}x64compatible{% else %}{{ARCH}}{% endif %}
+ArchitecturesInstallIn64BitMode={% if ARCH == 'x64' %}x64compatible{% else %}{{ARCH}}{% endif %}
 
 [Code]
 const
@@ -134,6 +134,7 @@ Name: "chineseSimplified"; MessagesFile: {% if locale.file %}{{ locale.file }}{%
 [Tasks]
 ; 默认勾选创建桌面快捷方式, 并且每次安装都根据当前脚本的默认值(不复用历史选择)
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
+Name: "desktopcompaticon"; Description: "{cm:CreateCompatibilityDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 [Files]
 Source: "{{SOURCE_DIR}}\\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall dontcopy
@@ -141,6 +142,11 @@ Source: "vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall dontcop
 
 [Icons]
 Name: "{autoprograms}\\{{DISPLAY_NAME}}"; Filename: "{app}\\{{EXECUTABLE_NAME}}"
+Name: "{autoprograms}\\{{DISPLAY_NAME}} (Compatibility Mode)"; Filename: "{app}\\Flclash (Compatibility Mode).exe"
 Name: "{autodesktop}\\{{DISPLAY_NAME}}"; Filename: "{app}\\{{EXECUTABLE_NAME}}"; Tasks: desktopicon
+Name: "{autodesktop}\\{{DISPLAY_NAME}} (Compatibility Mode)"; Filename: "{app}\\Flclash (Compatibility Mode).exe"; Tasks: desktopcompaticon
 [Run]
 Filename: "{app}\\{{EXECUTABLE_NAME}}"; Description: "{cm:LaunchProgram,{{DISPLAY_NAME}}}"; Flags: {% if PRIVILEGES_REQUIRED == 'admin' %}runascurrentuser{% endif %} nowait postinstall skipifsilent
+
+[CustomMessages]
+english.CreateCompatibilityDesktopIcon=Create compatibility mode desktop shortcut(&C)

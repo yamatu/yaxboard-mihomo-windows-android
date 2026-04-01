@@ -87,6 +87,14 @@ Xboard-Mihomo 使用**主源配置**模式，将所有服务器信息集中在�
 ```
 
 ### 2. xboard.config.yaml（客户端）
+
+支持三级加载顺序：
+
+- 远端启动配置：`xboard.bootstrap.remote_url`
+- 外置本地文件：应用数据目录下的 `xboard.config.yaml`
+- 内置兜底：`assets/config/xboard.config.yaml`
+
+可用于你说的“网盘更新”场景：把 `xboard.config.yaml` 和 `config.json` 都放到可直链访问的网盘/CDN 上，客户端只需要内置一个最小入口 URL。
 ```yaml
 xboard:
   provider: mihomo

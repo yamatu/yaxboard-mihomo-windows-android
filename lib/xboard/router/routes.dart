@@ -6,6 +6,7 @@ import 'package:fl_clash/xboard/features/payment/pages/payment_gateway_page.dart
 import 'package:fl_clash/xboard/features/online_support/pages/online_support_page.dart';
 import 'package:fl_clash/xboard/features/invite/pages/invite_page.dart';
 import 'package:fl_clash/xboard/features/auth/pages/login_page.dart';
+import 'package:fl_clash/xboard/features/connection/pages/connection_detail_page.dart';
 import 'package:fl_clash/xboard/domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -70,6 +71,19 @@ final List<RouteBase> routes = [
               name: 'invite',
               pageBuilder: (context, state) => const NoTransitionPage(
                 child: InvitePage(),
+              ),
+            ),
+          ],
+        ),
+
+        // 连接详情分支
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/connections',
+              name: 'connections',
+              pageBuilder: (context, state) => const NoTransitionPage(
+                child: ConnectionDetailPage(),
               ),
             ),
           ],

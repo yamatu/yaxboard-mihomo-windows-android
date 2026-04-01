@@ -2,6 +2,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -41,14 +42,14 @@ class _NetworkSpeedState extends State<NetworkSpeed> {
 
   @override
   Widget build(BuildContext context) {
-    final color = context.colorScheme.onSurfaceVariant.opacity80;
+    final color = CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context).withOpacity(0.8);
     return SizedBox(
       height: getWidgetHeight(2),
       child: CommonCard(
         onPressed: () {},
         info: Info(
           label: appLocalizations.networkSpeed,
-          iconData: Icons.speed_sharp,
+          iconData: CupertinoIcons.speedometer,
         ),
         child: Consumer(
           builder: (_, ref, __) {
@@ -64,7 +65,7 @@ class _NetworkSpeedState extends State<NetworkSpeed> {
                     ),
                     child: LineChart(
                       gradient: true,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: CupertinoTheme.of(context).primaryColor,
                       points: _getPoints(traffics),
                     ),
                   ),

@@ -3,6 +3,7 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/dialog.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class BaseNavigator {
@@ -77,16 +78,16 @@ class CommonDesktopRoute<T> extends PageRoute<T> {
   Duration get reverseTransitionDuration => Duration(milliseconds: 200);
 }
 
-class CommonRoute<T> extends MaterialPageRoute<T> {
+class CommonRoute<T> extends CupertinoPageRoute<T> {
   CommonRoute({
     required super.builder,
   });
 
   @override
-  Duration get transitionDuration => const Duration(milliseconds: 500);
+  Duration get transitionDuration => const Duration(milliseconds: 400);
 
   @override
-  Duration get reverseTransitionDuration => const Duration(milliseconds: 500);
+  Duration get reverseTransitionDuration => const Duration(milliseconds: 400);
 }
 
 final Animatable<Offset> _kRightMiddleTween = Tween<Offset>(

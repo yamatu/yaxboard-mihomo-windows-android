@@ -8,6 +8,7 @@ import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/state.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -542,20 +543,20 @@ class _ListHeaderState extends State<ListHeader> {
             Row(
               children: [
                 if (isExpand) ...[
-                  IconButton(
-                    visualDensity: VisualDensity.standard,
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
                     onPressed: () {
                       widget.onScrollToSelected(groupName);
                     },
-                    icon: const Icon(
-                      Icons.adjust,
+                    child: const Icon(
+                      CupertinoIcons.scope,
                     ),
                   ),
-                  IconButton(
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
                     onPressed: _delayTest,
-                    visualDensity: VisualDensity.standard,
-                    icon: const Icon(
-                      Icons.network_ping,
+                    child: const Icon(
+                      CupertinoIcons.antenna_radiowaves_left_right,
                     ),
                   ),
                   const SizedBox(
@@ -565,11 +566,12 @@ class _ListHeaderState extends State<ListHeader> {
                   SizedBox(
                     width: 4,
                   ),
-                IconButton.filledTonal(
+                CupertinoButton(
+                  padding: EdgeInsets.all(8),
                   onPressed: () {
                     _handleChange(groupName);
                   },
-                  icon: CommonExpandIcon(
+                  child: CommonExpandIcon(
                     expand: isExpand,
                   ),
                 )

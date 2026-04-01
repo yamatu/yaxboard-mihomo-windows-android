@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/xboard/features/online_support/models/message_model.dart';
@@ -159,22 +160,22 @@ class _OnlineSupportPageState extends ConsumerState<OnlineSupportPage> {
     Color getConnectionStatusColor() {
       switch (wsConnectionStatus) {
         case WebSocketStatus.connected:
-          return Colors.green;
+          return CupertinoColors.systemGreen;
         case WebSocketStatus.connecting:
-          return Colors.orange;
+          return CupertinoColors.systemOrange;
         case WebSocketStatus.disconnected:
-          return Colors.grey;
+          return CupertinoColors.systemGrey;
         case WebSocketStatus.error:
-          return Colors.red;
+          return CupertinoColors.systemRed;
       }
     }
 
     // 页面构建
     // 根据操作系统平台判断设备类型
     final isDesktop = Platform.isLinux || Platform.isWindows || Platform.isMacOS;
-    
+
     final scaffold = Scaffold(
-      appBar: isDesktop 
+      appBar: isDesktop
         ? null  // 桌面端不显示 AppBar，由 Shell 提供导航
         : AppBar(
             title: Column(
@@ -191,22 +192,13 @@ class _OnlineSupportPageState extends ConsumerState<OnlineSupportPage> {
               ],
             ),
             centerTitle: true,
-        // actions: [
-        //   // 添加清除历史按钮
-        //   IconButton(
-        //     icon: const Icon(Icons.delete_outline),
-        //     tooltip: '清除历史记录',
-        //     onPressed: showClearHistoryDialog,
-        //   ),
-        //   const SizedBox(width: 8),
-        // ],
       ),
       body: Column(
         children: [
           // 消息列表
           Expanded(
             child: chatState.isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(child: CupertinoActivityIndicator())
                 : chatState.messages.isEmpty
                     ? Center(child: Text(appLocalizations.onlineSupportNoMessages))
                     : CustomScrollView(
@@ -251,7 +243,7 @@ class _OnlineSupportPageState extends ConsumerState<OnlineSupportPage> {
                               child: Center(
                                 child: Padding(
                                   padding: EdgeInsets.all(8.0),
-                                  child: CircularProgressIndicator(),
+                                  child: CupertinoActivityIndicator(),
                                 ),
                               ),
                             ),
@@ -262,13 +254,13 @@ class _OnlineSupportPageState extends ConsumerState<OnlineSupportPage> {
           // 错误提示
           if (chatState.isError)
             Container(
-              color: Colors.red.withValues(alpha: 0.1),
+              color: CupertinoColors.systemRed.withValues(alpha: 0.1),
               padding: const EdgeInsets.all(8),
               width: double.infinity,
               child: Text(
                 chatState.errorMessage,
                 style: const TextStyle(
-                  color: Colors.red,
+                  color: CupertinoColors.systemRed,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -278,7 +270,7 @@ class _OnlineSupportPageState extends ConsumerState<OnlineSupportPage> {
           Container(
             padding: const EdgeInsets.all(8.0),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
+              color: CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context),
               boxShadow: const [
                 BoxShadow(
                   color: Colors.black12,
@@ -290,32 +282,28 @@ class _OnlineSupportPageState extends ConsumerState<OnlineSupportPage> {
             child: Row(
               children: [
                 // 图片选择按钮
-                IconButton(
+                CupertinoButton(
+                  padding: const EdgeInsets.all(8),
                   onPressed: chatState.isSending ? null : showImagePicker,
-                  icon: Icon(
-                    Icons.image,
-                    color: Theme.of(context).colorScheme.primary,
+                  child: Icon(
+                    CupertinoIcons.photo,
+                    color: CupertinoTheme.of(context).primaryColor,
                   ),
-                  tooltip: appLocalizations.onlineSupportSendImage,
                 ),
                 const SizedBox(width: 4),
 
                 // 文本输入框
                 Expanded(
-                  child: TextField(
+                  child: CupertinoTextField(
                     controller: textController,
-                    decoration: InputDecoration(
-                      hintText: appLocalizations.onlineSupportInputHint,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
+                    placeholder: appLocalizations.onlineSupportInputHint,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: CupertinoDynamicColor.resolve(CupertinoColors.secondarySystemGroupedBackground, context),
+                      borderRadius: BorderRadius.circular(24),
                     ),
                     maxLines: null,
                     textInputAction: TextInputAction.send,
@@ -325,21 +313,21 @@ class _OnlineSupportPageState extends ConsumerState<OnlineSupportPage> {
                 const SizedBox(width: 8),
 
                 // 发送按钮
-                CircleAvatar(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  child: chatState.isSending
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : IconButton(
-                          icon: const Icon(Icons.send, color: Colors.white),
-                          onPressed: chatState.isSending ? null : sendMessage,
-                        ),
+                GestureDetector(
+                  onTap: chatState.isSending ? null : sendMessage,
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: CupertinoTheme.of(context).primaryColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: chatState.isSending
+                          ? const CupertinoActivityIndicator(color: CupertinoColors.white)
+                          : const Icon(CupertinoIcons.paperplane_fill, color: CupertinoColors.white, size: 20),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -347,7 +335,7 @@ class _OnlineSupportPageState extends ConsumerState<OnlineSupportPage> {
         ],
       ),
     );
-    
+
     // 移动端需要拦截返回按钮，桌面端直接返回 scaffold
     if (isDesktop) {
       return scaffold;

@@ -1,5 +1,6 @@
 import 'package:fl_clash/manager/message_manager.dart';
 import 'package:fl_clash/widgets/scaffold.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 extension BuildContextExtension on BuildContext {
@@ -52,6 +53,13 @@ extension BuildContextExtension on BuildContext {
   ColorScheme get colorScheme => Theme.of(this).colorScheme;
 
   TextTheme get textTheme => Theme.of(this).textTheme;
+
+  CupertinoThemeData get cupertinoTheme => CupertinoTheme.of(this);
+
+  Color get cupertinoResolvedColor =>
+      CupertinoDynamicColor.resolve(CupertinoColors.label, this);
+
+  Brightness get brightness => Theme.of(this).brightness;
 
   T? findLastStateOfType<T extends State>() {
     T? state;
