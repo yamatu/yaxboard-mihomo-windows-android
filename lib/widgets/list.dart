@@ -3,6 +3,7 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/open_container.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'card.dart';
@@ -252,20 +253,46 @@ class ListItem<T> extends StatelessWidget {
     Widget? trailing,
     Widget? leading,
   }) {
-    return ListTile(
-      key: key,
-      dense: dense,
-      titleTextStyle: titleTextStyle,
-      subtitleTextStyle: subtitleTextStyle,
-      leading: leading ?? this.leading,
-      horizontalTitleGap: horizontalTitleGap,
-      title: title,
-      minVerticalPadding: 12,
-      subtitle: subtitle,
-      titleAlignment: tileTitleAlignment,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      trailing: trailing ?? this.trailing,
-      contentPadding: padding,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 44),
+        padding: padding,
+        child: Row(
+          children: [
+            if ((leading ?? this.leading) != null) ...[
+              leading ?? this.leading!,
+              SizedBox(width: horizontalTitleGap ?? 12),
+            ],
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  DefaultTextStyle(
+                    style: titleTextStyle ?? const TextStyle(fontSize: 17),
+                    child: title,
+                  ),
+                  if (subtitle != null)
+                    DefaultTextStyle(
+                      style: subtitleTextStyle ??
+                          const TextStyle(
+                            fontSize: 13,
+                            color: CupertinoColors.secondaryLabel,
+                          ),
+                      child: subtitle!,
+                    ),
+                ],
+              ),
+            ),
+            if ((trailing ?? this.trailing) != null) ...[
+              const SizedBox(width: 8),
+              trailing ?? this.trailing!,
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -403,7 +430,7 @@ class ListItem<T> extends StatelessWidget {
             switchDelegate.onChanged!(!switchDelegate.value);
           }
         },
-        trailing: Switch(
+        trailing: CupertinoSwitch(
           value: switchDelegate.value,
           onChanged: switchDelegate.onChanged,
         ),
@@ -417,13 +444,13 @@ class ListItem<T> extends StatelessWidget {
             radioDelegate.onChanged!(radioDelegate.value);
           }
         },
-        leading: Radio<T>(
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          value: radioDelegate.value,
-          groupValue: radioDelegate.groupValue,
-          onChanged: radioDelegate.onChanged,
-          toggleable: true,
-        ),
+        leading: radioDelegate.value == radioDelegate.groupValue
+            ? const Icon(
+                CupertinoIcons.check_mark,
+                color: CupertinoColors.activeBlue,
+                size: 20,
+              )
+            : const SizedBox(width: 20),
         trailing: trailing,
       );
     }
@@ -470,21 +497,26 @@ class ListHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurfaceVariant
-                            .opacity80,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  title.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: CupertinoDynamicColor.resolve(
+                      CupertinoColors.secondaryLabel,
+                      context,
+                    ),
+                  ),
                 ),
                 if (subTitle != null)
                   Text(
                     subTitle!,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.outline,
-                        ),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: CupertinoDynamicColor.resolve(
+                        CupertinoColors.secondaryLabel,
+                        context,
+                      ),
+                    ),
                   ),
               ],
             ),
@@ -513,8 +545,10 @@ List<Widget> generateSection({
 }) {
   final genItems = separated
       ? items.separated(
-          const Divider(
-            height: 0,
+          Container(
+            height: 0.5,
+            margin: const EdgeInsets.only(left: 16),
+            color: CupertinoColors.separator,
           ),
         )
       : items;
@@ -562,8 +596,10 @@ List<Widget> generateInfoSection({
 }) {
   final genItems = separated
       ? items.separated(
-          const Divider(
-            height: 0,
+          Container(
+            height: 0.5,
+            margin: const EdgeInsets.only(left: 16),
+            color: CupertinoColors.separator,
           ),
         )
       : items;

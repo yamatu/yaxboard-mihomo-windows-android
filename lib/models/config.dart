@@ -44,6 +44,7 @@ const List<DashboardWidget> defaultDashboardWidgets = [
   DashboardWidget.networkSpeed,
   DashboardWidget.systemProxyButton,
   DashboardWidget.tunButton,
+  DashboardWidget.ipv6Button,
   DashboardWidget.outboundMode,
   DashboardWidget.networkDetection,
   DashboardWidget.trafficUsage,
@@ -54,10 +55,20 @@ List<DashboardWidget> dashboardWidgetsSafeFormJson(
   List<dynamic>? dashboardWidgets,
 ) {
   try {
-    return dashboardWidgets
+    final items = dashboardWidgets
             ?.map((e) => $enumDecode(_$DashboardWidgetEnumMap, e))
             .toList() ??
         defaultDashboardWidgets;
+    if (!items.contains(DashboardWidget.ipv6Button)) {
+      final insertIndex = items.indexOf(DashboardWidget.tunButton);
+      final nextItems = List<DashboardWidget>.from(items);
+      nextItems.insert(
+        insertIndex == -1 ? nextItems.length : insertIndex + 1,
+        DashboardWidget.ipv6Button,
+      );
+      return nextItems;
+    }
+    return items;
   } catch (_) {
     return defaultDashboardWidgets;
   }

@@ -6,6 +6,7 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' hide context;
@@ -154,8 +155,8 @@ class _GeoDataListItemState extends State<GeoDataListItem> {
                       ? SizedBox(
                           width: height,
                           height: height,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
+                          child: CupertinoActivityIndicator(
+                            radius: 6,
                           ),
                         )
                       : Text(
@@ -177,14 +178,14 @@ class _GeoDataListItemState extends State<GeoDataListItem> {
               spacing: 12,
               children: [
                 CommonChip(
-                  avatar: const Icon(Icons.edit),
+                  avatar: const Icon(CupertinoIcons.pencil),
                   label: appLocalizations.edit,
                   onPressed: () {
                     _updateUrl(url, ref);
                   },
                 ),
                 CommonChip(
-                  avatar: const Icon(Icons.sync),
+                  avatar: const Icon(CupertinoIcons.arrow_2_circlepath),
                   label: appLocalizations.sync,
                   onPressed: () {
                     _handleUpdateGeoDataItem();
@@ -251,7 +252,7 @@ class _GeoDataListItemState extends State<GeoDataListItem> {
               child: isUpdating
                   ? const Padding(
                       padding: EdgeInsets.all(8),
-                      child: CircularProgressIndicator(),
+                      child: CupertinoActivityIndicator(),
                     )
                   : const SizedBox(),
             );

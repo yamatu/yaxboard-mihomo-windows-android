@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:fl_clash/providers/app.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -25,24 +26,17 @@ class CommonDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, ref) {
     final size = ref.watch(viewSizeProvider);
-    return AlertDialog(
+    return CupertinoAlertDialog(
       title: Text(title),
-      actions: actions,
-      contentPadding: padding,
-      backgroundColor: backgroundColor,
+      actions: actions ?? [],
       content: Container(
         constraints: BoxConstraints(
-          maxHeight: min(
-            size.height - 40,
-            500,
-          ),
+          maxHeight: min(size.height - 40, 500),
           maxWidth: 300,
         ),
         width: size.width - 40,
         child: !overrideScroll
-            ? SingleChildScrollView(
-                child: child,
-              )
+            ? SingleChildScrollView(child: child)
             : child,
       ),
     );

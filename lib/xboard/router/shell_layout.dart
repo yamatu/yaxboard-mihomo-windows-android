@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:fl_clash/xboard/widgets/navigation/desktop_navigation_rail.dart';
 import 'package:fl_clash/xboard/widgets/navigation/mobile_navigation_bar.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -18,8 +19,7 @@ class AdaptiveShellLayout extends ConsumerWidget {
 
   void _onDestinationSelected(BuildContext context, int index, bool isDesktop) {
     if (isDesktop) {
-      // 桌面端路由：首页、套餐、邀请（在线客服功能已关闭）
-      // 使用 context.go() 让 GoRouter 自动切换到对应的分支
+      // 桌面端路由：首页、套餐、邀请、连接
       switch (index) {
         case 0:
           context.go('/');
@@ -29,6 +29,9 @@ class AdaptiveShellLayout extends ConsumerWidget {
           break;
         case 2:
           context.go('/invite');
+          break;
+        case 3:
+          context.go('/connections');
           break;
       }
     } else {
@@ -47,13 +50,13 @@ class AdaptiveShellLayout extends ConsumerWidget {
 
   int _getCurrentIndex(BuildContext context, bool isDesktop) {
     final location = GoRouterState.of(context).uri.path;
-    
+
     if (isDesktop) {
-      // 桌面端导航栏索引：首页(0)、套餐(1)、邀请(2)
-      // 在线客服功能已关闭，不再出现在桌面端导航中
+      // 桌面端导航栏索引：首页(0)、套餐(1)、邀请(2)、连接(3)
       if (location == '/') return 0;
       if (location.startsWith('/plans')) return 1;
       if (location.startsWith('/invite')) return 2;
+      if (location.startsWith('/connections')) return 3;
       return 0;
     } else {
       // 移动端导航栏索引：首页(0)、邀请(1)

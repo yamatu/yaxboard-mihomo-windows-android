@@ -230,10 +230,20 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
             file
         )
 
+        val mimeType = when (file.extension.lowercase()) {
+            "apk" -> "application/vnd.android.package-archive"
+            "txt", "log", "yaml", "yml" -> "text/plain"
+            "png" -> "image/png"
+            "jpg", "jpeg" -> "image/jpeg"
+            "pdf" -> "application/pdf"
+            else -> "*/*"
+        }
+
         val intent = Intent(Intent.ACTION_VIEW).setDataAndType(
             uri,
-            "text/plain"
+            mimeType
         )
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
         val flags =
             Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION

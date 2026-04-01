@@ -45,6 +45,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/app/keystore.jks
 
 
 
@@ -68,3 +69,18 @@ assets/cer/
 
 # Windows packaging cache
 /windows/packaging/exe/vc_redist.x64.exe
+
+# Local workspace tooling
+/.golutra/
+/.golutra-chat-list.json
+/.golutra-chat-send.json
+
+# Local update-pan artifacts
+/services/update-pan/config.local.json
+/services/update-pan/data/files/
+/services/update-pan/xboard-update-pan.exe
+
+# Local build outputs
+/services/helper/target/
+/core/build_deps.txt
+/core/libclash/

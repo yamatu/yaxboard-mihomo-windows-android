@@ -4,6 +4,7 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -99,13 +100,13 @@ class _OverrideProfileViewState extends State<OverrideProfileView> {
         );
         if (!isInit) {
           return Center(
-            child: CircularProgressIndicator(),
+            child: CupertinoActivityIndicator(),
           );
         }
         return FadeBox(
           child: !isInit
               ? Center(
-                  child: CircularProgressIndicator(),
+                  child: CupertinoActivityIndicator(),
                 )
               : child!,
         );
@@ -141,7 +142,7 @@ class _OverrideProfileViewState extends State<OverrideProfileView> {
                       title: Row(
                         spacing: 8,
                         children: [
-                          Icon(Icons.info),
+                          Icon(CupertinoIcons.info),
                           Text(
                             appLocalizations.overrideInvalidTip,
                           )
@@ -245,7 +246,8 @@ class _OverrideProfileViewState extends State<OverrideProfileView> {
                           _handleSave(ref, newOverrideData);
                           return true;
                         },
-                        child: IconButton(
+                        child: CupertinoButton(
+                          padding: EdgeInsets.zero,
                           onPressed: () async {
                             final res = await globalState.showMessage(
                               message: TextSpan(
@@ -258,15 +260,16 @@ class _OverrideProfileViewState extends State<OverrideProfileView> {
                             }
                             _handleSave(ref, newOverrideData);
                           },
-                          icon: Icon(
-                            Icons.save,
+                          child: Icon(
+                            CupertinoIcons.floppy_disk,
                           ),
                         ),
                       );
                     },
                   ),
                 if (editCount == 1)
-                  IconButton(
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
                     onPressed: () {
                       final rule = ref.read(profileOverrideStateProvider.select(
                         (state) {
@@ -283,17 +286,18 @@ class _OverrideProfileViewState extends State<OverrideProfileView> {
                         rule,
                       );
                     },
-                    icon: Icon(
-                      Icons.edit,
+                    child: Icon(
+                      CupertinoIcons.pencil,
                     ),
                   ),
                 if (editCount > 0)
-                  IconButton(
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
                     onPressed: () {
                       _handleDelete(ref);
                     },
-                    icon: Icon(
-                      Icons.delete,
+                    child: Icon(
+                      CupertinoIcons.delete,
                     ),
                   )
               ],
@@ -415,9 +419,10 @@ class RuleTitle extends ConsumerWidget {
           space: 8,
           actions: [
             if (!isEdit)
-              IconButton.filledTonal(
-                icon: Icon(
-                  isOverrideRule ? Icons.edit_document : Icons.note_add,
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                child: Icon(
+                  isOverrideRule ? CupertinoIcons.doc_text : Icons.note_add_outlined,
                 ),
                 onPressed: () {
                   _handleChangeType(

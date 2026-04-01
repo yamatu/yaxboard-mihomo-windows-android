@@ -4,6 +4,7 @@ import 'package:fl_clash/models/common.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/dialog.dart';
 import 'package:fl_clash/widgets/null_status.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'card.dart';
@@ -75,10 +76,28 @@ class CommonCheckBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Checkbox(
-      shape: isCircle ? const CircleBorder() : null,
-      value: value,
-      onChanged: onChanged,
+    return GestureDetector(
+      onTap: onChanged != null ? () => onChanged!(!value!) : null,
+      child: Container(
+        width: 22,
+        height: 22,
+        decoration: BoxDecoration(
+          shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
+          borderRadius: isCircle ? null : BorderRadius.circular(4),
+          color: value == true
+              ? CupertinoTheme.of(context).primaryColor
+              : Colors.transparent,
+          border: Border.all(
+            color: value == true
+                ? CupertinoTheme.of(context).primaryColor
+                : CupertinoDynamicColor.resolve(CupertinoColors.separator, context),
+            width: 1.5,
+          ),
+        ),
+        child: value == true
+            ? const Icon(CupertinoIcons.check_mark, size: 16, color: CupertinoColors.white)
+            : null,
+      ),
     );
   }
 }
@@ -148,15 +167,12 @@ class _InputDialogState extends State<InputDialog> {
       actions: [
         if (widget.resetValue != null &&
             textController.value.text != widget.resetValue) ...[
-          TextButton(
+          CupertinoDialogAction(
             onPressed: _handleReset,
             child: Text(appLocalizations.reset),
           ),
-          const SizedBox(
-            width: 4,
-          ),
         ],
-        TextButton(
+        CupertinoDialogAction(
           onPressed: _handleUpdate,
           child: Text(appLocalizations.submit),
         )
@@ -269,11 +285,14 @@ class ListInputPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return FloatLayout(
       floatingWidget: FloatWrapper(
-        child: FloatingActionButton(
+        child: CupertinoButton(
+          color: CupertinoTheme.of(context).primaryColor,
+          borderRadius: BorderRadius.circular(22),
+          padding: const EdgeInsets.all(14),
           onPressed: () async {
             _handleAddOrEdit();
           },
-          child: const Icon(Icons.add),
+          child: const Icon(CupertinoIcons.add, color: CupertinoColors.white),
         ),
       ),
       child: items.isEmpty
@@ -299,7 +318,7 @@ class ListInputPage extends StatelessWidget {
                             ? subtitleBuilder!(e)
                             : null,
                         trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline),
+                          icon: const Icon(CupertinoIcons.delete),
                           onPressed: () {
                             _handleDelete(e);
                           },
@@ -420,11 +439,14 @@ class MapInputPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return FloatLayout(
       floatingWidget: FloatWrapper(
-        child: FloatingActionButton(
+        child: CupertinoButton(
+          color: CupertinoTheme.of(context).primaryColor,
+          borderRadius: BorderRadius.circular(22),
+          padding: const EdgeInsets.all(14),
           onPressed: () async {
             _handleAddOrEdit();
           },
-          child: const Icon(Icons.add),
+          child: const Icon(CupertinoIcons.add, color: CupertinoColors.white),
         ),
       ),
       child: items.isEmpty
@@ -451,7 +473,7 @@ class MapInputPage extends StatelessWidget {
                             ? subtitleBuilder!(e)
                             : null,
                         trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline),
+                          icon: const Icon(CupertinoIcons.delete),
                           onPressed: () {
                             _handleDelete(e);
                           },
@@ -537,7 +559,7 @@ class _AddDialogState extends State<AddDialog> {
     return CommonDialog(
       title: widget.title,
       actions: [
-        TextButton(
+        CupertinoDialogAction(
           onPressed: _submit,
           child: Text(appLocalizations.confirm),
         )
@@ -607,15 +629,11 @@ class _InputItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      elevation: 0,
+    return Container(
       key: key,
-      color: Colors.transparent,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16),
-        margin: EdgeInsets.symmetric(vertical: 8),
-        child: child,
-      ),
+      padding: EdgeInsets.symmetric(horizontal: 16),
+      margin: EdgeInsets.symmetric(vertical: 8),
+      child: child,
     );
   }
 }

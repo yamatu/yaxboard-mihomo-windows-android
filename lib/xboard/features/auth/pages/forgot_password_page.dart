@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:fl_clash/xboard/utils/xboard_notification.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_clash/xboard/features/shared/shared.dart';
@@ -124,13 +125,16 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
     });
   }
   Widget _buildSendCodeStep() {
+    final labelColor = CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           AppLocalizations.of(context).enterEmailForReset,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          style: TextStyle(
+            fontSize: 15,
+            color: labelColor,
           ),
         ),
         const SizedBox(height: 32),
@@ -138,7 +142,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
           controller: _emailController,
           labelText: AppLocalizations.of(context).emailAddress,
           hintText: AppLocalizations.of(context).pleaseEnterEmail,
-          prefixIcon: Icons.email_outlined,
+          prefixIcon: CupertinoIcons.mail,
           keyboardType: TextInputType.emailAddress,
           enabled: !_isLoading,
           validator: (value) {
@@ -156,28 +160,19 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
           width: double.infinity,
           height: 48,
           child: _isLoading
-              ? ElevatedButton(
+              ? CupertinoButton.filled(
                   onPressed: null,
-                  child: const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                    ),
+                  padding: EdgeInsets.zero,
+                  child: const CupertinoActivityIndicator(
+                    color: CupertinoColors.white,
                   ),
                 )
-              : ElevatedButton(
+              : CupertinoButton.filled(
                   onPressed: _sendVerificationCode,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
+                  padding: EdgeInsets.zero,
                   child: Text(
                     AppLocalizations.of(context).sendVerificationCode,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
@@ -189,13 +184,17 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
   }
 
   Widget _buildResetPasswordStep() {
+    final primaryColor = CupertinoTheme.of(context).primaryColor;
+    final labelColor = CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           AppLocalizations.of(context).verificationCodeSentTo(_emailController.text),
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          style: TextStyle(
+            fontSize: 15,
+            color: labelColor,
           ),
         ),
         const SizedBox(height: 32),
@@ -203,7 +202,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
           controller: _codeController,
           labelText: AppLocalizations.of(context).verificationCode,
           hintText: AppLocalizations.of(context).pleaseEnterVerificationCode,
-          prefixIcon: Icons.verified_user_outlined,
+          prefixIcon: CupertinoIcons.checkmark_shield,
           keyboardType: TextInputType.number,
           enabled: !_isLoading,
           validator: (value) {
@@ -221,12 +220,14 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
           controller: _passwordController,
           labelText: AppLocalizations.of(context).newPassword,
           hintText: AppLocalizations.of(context).pleaseEnterNewPassword,
-          prefixIcon: Icons.lock_outlined,
+          prefixIcon: CupertinoIcons.lock,
           obscureText: _obscurePassword,
           enabled: !_isLoading,
-          suffixIcon: IconButton(
-            icon: Icon(
-              _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+          suffixIcon: CupertinoButton(
+            padding: EdgeInsets.zero,
+            child: Icon(
+              _obscurePassword ? CupertinoIcons.eye : CupertinoIcons.eye_slash,
+              color: labelColor,
             ),
             onPressed: () {
               setState(() {
@@ -249,12 +250,14 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
           controller: _confirmPasswordController,
           labelText: AppLocalizations.of(context).confirmNewPassword,
           hintText: AppLocalizations.of(context).pleaseConfirmNewPassword,
-          prefixIcon: Icons.lock_outlined,
+          prefixIcon: CupertinoIcons.lock,
           obscureText: _obscureConfirmPassword,
           enabled: !_isLoading,
-          suffixIcon: IconButton(
-            icon: Icon(
-              _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+          suffixIcon: CupertinoButton(
+            padding: EdgeInsets.zero,
+            child: Icon(
+              _obscureConfirmPassword ? CupertinoIcons.eye : CupertinoIcons.eye_slash,
+              color: labelColor,
             ),
             onPressed: () {
               setState(() {
@@ -277,28 +280,19 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
           width: double.infinity,
           height: 48,
           child: _isLoading
-              ? ElevatedButton(
+              ? CupertinoButton.filled(
                   onPressed: null,
-                  child: const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                    ),
+                  padding: EdgeInsets.zero,
+                  child: const CupertinoActivityIndicator(
+                    color: CupertinoColors.white,
                   ),
                 )
-              : ElevatedButton(
+              : CupertinoButton.filled(
                   onPressed: _resetPassword,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
+                  padding: EdgeInsets.zero,
                   child: Text(
                     AppLocalizations.of(context).resetPassword,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
@@ -306,12 +300,13 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                 ),
         ),
         const SizedBox(height: 16),
-        TextButton(
+        CupertinoButton(
+          padding: EdgeInsets.zero,
           onPressed: _isLoading ? null : _goBackToSendCode,
           child: Text(
             AppLocalizations.of(context).resendVerificationCode,
             style: TextStyle(
-              color: Theme.of(context).colorScheme.primary,
+              color: primaryColor,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -322,9 +317,13 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final primaryColor = CupertinoTheme.of(context).primaryColor;
+    final labelColor = CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context);
+    final textColor = CupertinoDynamicColor.resolve(CupertinoColors.label, context);
+    final bgColor = CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context);
+
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: bgColor,
       body: XBContainer(
         child: Column(
           children: [
@@ -332,7 +331,8 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
               padding: const EdgeInsets.all(16.0),
               child: Row(
                 children: [
-                  IconButton(
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
                     onPressed: () {
                       if (_currentStep == ResetPasswordStep.resetPassword) {
                         _goBackToSendCode();
@@ -340,17 +340,22 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                         context.pop();
                       }
                     },
-                    icon: const Icon(Icons.arrow_back),
-                    style: IconButton.styleFrom(
-                      backgroundColor: colorScheme.surfaceContainerLow,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: CupertinoDynamicColor.resolve(CupertinoColors.tertiarySystemFill, context),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(CupertinoIcons.back, color: textColor),
                     ),
                   ),
                   const SizedBox(width: 16),
                   Text(
                     _currentStep == ResetPasswordStep.sendCode ? AppLocalizations.of(context).resetPassword : AppLocalizations.of(context).setNewPassword,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: colorScheme.onSurface,
+                    style: TextStyle(
+                      fontSize: 28,
                       fontWeight: FontWeight.bold,
+                      color: textColor,
                     ),
                   ),
                 ],
@@ -376,16 +381,18 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                           children: [
                             Text(
                               AppLocalizations.of(context).rememberPassword,
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: labelColor,
                               ),
                             ),
-                            TextButton(
+                            CupertinoButton(
+                              padding: EdgeInsets.zero,
                               onPressed: () => context.pop(),
                               child: Text(
                                 AppLocalizations.of(context).backToLogin,
                                 style: TextStyle(
-                                  color: colorScheme.primary,
+                                  color: primaryColor,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),

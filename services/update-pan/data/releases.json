@@ -1,0 +1,22 @@
+{
+  "releases": [
+    {
+      "version": "1.0.1",
+      "platform": "windows",
+      "file": "Xboard-Mihomo_1.0.1_windows.exe",
+      "notes": "Windows hotfix build",
+      "mandatory": false,
+      "direct": false,
+      "description": "Windows installer"
+    },
+    {
+      "version": "1.0.1",
+      "platform": "android",
+      "file": "Xboard-Mihomo_1.0.1_android.apk",
+      "notes": "Android hotfix build",
+      "mandatory": false,
+      "direct": true,
+      "description": "Android APK"
+    }
+  ]
+}

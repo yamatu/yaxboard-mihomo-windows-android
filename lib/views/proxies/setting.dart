@@ -2,6 +2,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -11,16 +12,16 @@ class ProxiesSetting extends StatelessWidget {
 
   IconData _getIconWithProxiesType(ProxiesType type) {
     return switch (type) {
-      ProxiesType.tab => Icons.view_carousel,
-      ProxiesType.list => Icons.view_list,
+      ProxiesType.tab => CupertinoIcons.rectangle_split_3x1,
+      ProxiesType.list => CupertinoIcons.list_bullet,
     };
   }
 
   IconData _getIconWithProxiesSortType(ProxiesSortType type) {
     return switch (type) {
-      ProxiesSortType.none => Icons.sort,
-      ProxiesSortType.delay => Icons.network_ping,
-      ProxiesSortType.name => Icons.sort_by_alpha,
+      ProxiesSortType.none => CupertinoIcons.sort_down,
+      ProxiesSortType.delay => CupertinoIcons.antenna_radiowaves_left_right,
+      ProxiesSortType.name => CupertinoIcons.textformat_abc,
     };
   }
 

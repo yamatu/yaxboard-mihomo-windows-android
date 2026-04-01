@@ -6,6 +6,7 @@ import 'package:fl_clash/views/config/dns.dart';
 import 'package:fl_clash/views/config/general.dart';
 import 'package:fl_clash/views/config/network.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -23,7 +24,7 @@ class _ConfigViewState extends State<ConfigView> {
       ListItem.open(
         title: Text(appLocalizations.general),
         subtitle: Text(appLocalizations.generalDesc),
-        leading: const Icon(Icons.build),
+        leading: const Icon(CupertinoIcons.wrench),
         delegate: OpenDelegate(
           title: appLocalizations.general,
           widget: generateListView(
@@ -35,7 +36,7 @@ class _ConfigViewState extends State<ConfigView> {
       ListItem.open(
         title: Text(appLocalizations.network),
         subtitle: Text(appLocalizations.networkDesc),
-        leading: const Icon(Icons.vpn_key),
+        leading: const Icon(CupertinoIcons.lock),
         delegate: OpenDelegate(
           title: appLocalizations.network,
           blur: false,
@@ -45,11 +46,12 @@ class _ConfigViewState extends State<ConfigView> {
       ListItem.open(
         title: const Text("DNS"),
         subtitle: Text(appLocalizations.dnsDesc),
-        leading: const Icon(Icons.dns),
+        leading: const Icon(CupertinoIcons.globe),
         delegate: OpenDelegate(
           title: "DNS",
           action: Consumer(builder: (_, ref, __) {
-            return IconButton(
+            return CupertinoButton(
+              padding: EdgeInsets.zero,
               onPressed: () async {
                 final res = await globalState.showMessage(
                   title: appLocalizations.reset,
@@ -66,9 +68,8 @@ class _ConfigViewState extends State<ConfigView> {
                       ),
                     );
               },
-              tooltip: appLocalizations.reset,
-              icon: const Icon(
-                Icons.replay,
+              child: const Icon(
+                CupertinoIcons.arrow_counterclockwise,
               ),
             );
           }),

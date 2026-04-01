@@ -4,6 +4,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/xboard/features/profile/providers/profile_import_provider.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -148,26 +149,16 @@ class _StartButtonState extends ConsumerState<StartButton>
 
     // Disabled placeholder (avoid accessing globalState.measure before init).
     if (!isReady || _startupLocked) {
-      return FloatingActionButton(
-        heroTag: null,
+      return CupertinoButton.filled(
         onPressed: null,
-        tooltip: disabledTip,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: isInit && hasProfile
-            ? const Icon(Icons.sync)
-            : const Icon(Icons.play_arrow),
+            ? const Icon(CupertinoIcons.arrow_2_circlepath)
+            : const Icon(CupertinoIcons.play_fill),
       );
     }
 
-    return Theme(
-      data: Theme.of(context).copyWith(
-        floatingActionButtonTheme: FloatingActionButtonThemeData(
-          sizeConstraints: BoxConstraints(
-            minWidth: 56,
-            maxWidth: 200,
-          ),
-        ),
-      ),
-      child: AnimatedBuilder(
+    return AnimatedBuilder(
         animation: _controller.view,
         builder: (_, child) {
           final textWidth = globalState.measure
@@ -176,15 +167,16 @@ class _StartButtonState extends ConsumerState<StartButton>
                       utils.getTimeDifference(
                         DateTime.now(),
                       ),
-                      style: context.textTheme.titleMedium?.toSoftBold,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   )
                   .width +
               16;
-          return FloatingActionButton(
-            clipBehavior: Clip.antiAlias,
-            materialTapTargetSize: MaterialTapTargetSize.padded,
-            heroTag: null,
+          return CupertinoButton.filled(
+            padding: EdgeInsets.zero,
             onPressed: () async {
               await handleSwitchStart();
             },
@@ -196,11 +188,7 @@ class _StartButtonState extends ConsumerState<StartButton>
                   width: 56,
                   alignment: Alignment.center,
                   child: _isBusy
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
+                      ? const CupertinoActivityIndicator()
                       : AnimatedIcon(
                           icon: AnimatedIcons.play_pause,
                           progress: _animation,
@@ -224,14 +212,14 @@ class _StartButtonState extends ConsumerState<StartButton>
               text,
               maxLines: 1,
               overflow: TextOverflow.visible,
-              style:
-                  Theme.of(context).textTheme.titleMedium?.toSoftBold.copyWith(
-                        color: context.colorScheme.onPrimaryContainer,
-                      ),
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: CupertinoColors.white,
+              ),
             );
           },
         ),
-      ),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:fl_clash/pages/pages.dart';
 import 'package:fl_clash/xboard/infrastructure/providers/repository_providers.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fl_clash/xboard/utils/xboard_notification.dart';
@@ -28,7 +29,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
       final subscriptionRepo = ref.read(subscriptionRepositoryProvider);
       final result = await subscriptionRepo.getSubscription();
       final subscriptionInfo = result.dataOrNull;
-      
+
       if (mounted) {
         setState(() {
           _subscriptionUrl = subscriptionInfo?.subscribeUrl;
@@ -60,7 +61,7 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
   }
   void _navigateToHome() {
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
+      CupertinoPageRoute(
         builder: (context) => const HomePage(),
       ),
     );
@@ -71,13 +72,15 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
       appBar: AppBar(
         title: const Text('订阅购买'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
+          CupertinoButton(
+            padding: EdgeInsets.zero,
             onPressed: _refreshSubscription,
+            child: const Icon(CupertinoIcons.refresh),
           ),
-          IconButton(
-            icon: const Icon(Icons.home),
+          CupertinoButton(
+            padding: EdgeInsets.zero,
             onPressed: _navigateToHome,
+            child: const Icon(CupertinoIcons.home),
           ),
         ],
       ),
@@ -86,35 +89,41 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Card(
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: CupertinoDynamicColor.resolve(CupertinoColors.secondarySystemGroupedBackground, context),
+                borderRadius: BorderRadius.circular(10),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       '订阅信息',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
+                        color: CupertinoDynamicColor.resolve(CupertinoColors.label, context),
                       ),
                     ),
                     const SizedBox(height: 16),
                     if (_isLoading)
-                      const Center(child: CircularProgressIndicator())
+                      const Center(child: CupertinoActivityIndicator())
                     else if (_errorMessage != null)
                       Column(
                         children: [
-                          const Icon(
-                            Icons.error,
-                            color: Colors.red,
+                          Icon(
+                            CupertinoIcons.exclamationmark_circle,
+                            color: CupertinoDynamicColor.resolve(CupertinoColors.destructiveRed, context),
                             size: 48,
                           ),
                           const SizedBox(height: 16),
                           Text(
                             '获取订阅信息失败',
                             style: TextStyle(
-                              color: Colors.red,
+                              color: CupertinoDynamicColor.resolve(CupertinoColors.destructiveRed, context),
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
@@ -122,10 +131,12 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
                           const SizedBox(height: 8),
                           Text(
                             _errorMessage!,
-                            style: const TextStyle(color: Colors.red),
+                            style: TextStyle(
+                              color: CupertinoDynamicColor.resolve(CupertinoColors.destructiveRed, context),
+                            ),
                           ),
                           const SizedBox(height: 16),
-                          ElevatedButton(
+                          CupertinoButton.filled(
                             onPressed: _refreshSubscription,
                             child: const Text('重新获取'),
                           ),
@@ -135,11 +146,12 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             '订阅链接:',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
+                              color: CupertinoDynamicColor.resolve(CupertinoColors.label, context),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -147,9 +159,11 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
                             width: double.infinity,
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
+                              color: CupertinoDynamicColor.resolve(CupertinoColors.tertiarySystemGroupedBackground, context),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey.shade300),
+                              border: Border.all(
+                                color: CupertinoDynamicColor.resolve(CupertinoColors.separator, context),
+                              ),
                             ),
                             child: Text(
                               _subscriptionUrl!,
@@ -163,18 +177,30 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
                           Row(
                             children: [
                               Expanded(
-                                child: ElevatedButton.icon(
+                                child: CupertinoButton.filled(
                                   onPressed: _copyToClipboard,
-                                  icon: const Icon(Icons.copy),
-                                  label: const Text('复制链接'),
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(CupertinoIcons.doc_on_doc, size: 18),
+                                      SizedBox(width: 6),
+                                      Text('复制链接'),
+                                    ],
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 16),
                               Expanded(
-                                child: ElevatedButton.icon(
+                                child: CupertinoButton.filled(
                                   onPressed: _refreshSubscription,
-                                  icon: const Icon(Icons.refresh),
-                                  label: const Text('刷新'),
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(CupertinoIcons.refresh, size: 18),
+                                      SizedBox(width: 6),
+                                      Text('刷新'),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
@@ -186,17 +212,23 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
               ),
             ),
             const SizedBox(height: 24),
-            Card(
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: CupertinoDynamicColor.resolve(CupertinoColors.secondarySystemGroupedBackground, context),
+                borderRadius: BorderRadius.circular(10),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       '使用说明',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
+                        color: CupertinoDynamicColor.resolve(CupertinoColors.label, context),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -219,14 +251,14 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
+                        color: CupertinoColors.systemBlue.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.blue.shade200),
+                        border: Border.all(color: CupertinoColors.systemBlue.withValues(alpha: 0.3)),
                       ),
                       child: const Text(
                         '提示: 请妥善保管您的订阅链接，不要分享给他人',
                         style: TextStyle(
-                          color: Colors.blue,
+                          color: CupertinoColors.systemBlue,
                           fontSize: 14,
                         ),
                       ),

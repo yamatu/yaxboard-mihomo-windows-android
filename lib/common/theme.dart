@@ -1,4 +1,5 @@
 import 'package:fl_clash/common/common.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class CommonTheme {
@@ -41,6 +42,28 @@ class CommonTheme {
       "darken3PrimaryContainer",
       () => context.colorScheme.primaryContainer
           .blendDarken(context, factor: 0.3),
+    );
+  }
+
+  // Cupertino grouped background colors
+  Color get groupedBackground {
+    return CupertinoDynamicColor.resolve(
+      CupertinoColors.systemGroupedBackground,
+      context,
+    );
+  }
+
+  Color get secondaryGroupedBackground {
+    return CupertinoDynamicColor.resolve(
+      CupertinoColors.secondarySystemGroupedBackground,
+      context,
+    );
+  }
+
+  Color get iosSeparator {
+    return CupertinoDynamicColor.resolve(
+      CupertinoColors.separator,
+      context,
     );
   }
 }

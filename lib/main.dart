@@ -10,7 +10,6 @@ import 'package:fl_clash/plugins/tile.dart';
 import 'package:fl_clash/plugins/vpn.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/xboard/config/xboard_config.dart';
-import 'package:fl_clash/xboard/config/utils/config_file_loader.dart'; // 配置文件加载器
 import 'package:fl_clash/xboard/infrastructure/network/domain_racing_service.dart'; // 域名竞速服务
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -42,7 +41,8 @@ Future<void> main() async {
       remoteTaskManager!.start(); // 启动 WebSocket 连接
       print('RemoteTaskManager 从配置初始化成功');
     } else {
-      print('警告: RemoteTaskManager 初始化失败 - 配置中未找到 WebSocket URL，应用将继续启动但远程任务功能不可用');
+      print(
+          '警告: RemoteTaskManager 初始化失败 - 配置中未找到 WebSocket URL，应用将继续启动但远程任务功能不可用');
     }
   } catch (e) {
     print('警告: RemoteTaskManager 初始化异常: $e，应用将继续启动但远程任务功能不可用');
@@ -71,16 +71,15 @@ Future<void> _loadSecurityConfig() async {
     final certConfig = await ConfigFileLoaderHelper.getCertificateConfig();
     final certPath = certConfig['path'] as String?;
     final certEnabled = certConfig['enabled'] as bool? ?? true;
-    
+
     if (certEnabled && certPath != null && certPath.isNotEmpty) {
       // 直接使用配置中的证书路径（已经是相对于项目根目录的完整路径）
       DomainRacingService.setCertificatePath(certPath);
       print('[Main] 证书路径配置: $certPath');
     }
-    
+
     // 其他安全配置可以在这里加载
     // 如 UA、解密密钥等
-    
   } catch (e) {
     print('[Main] 加载安全配置失败（使用默认值）: $e');
   }
@@ -93,7 +92,9 @@ Future<void> _initializeXBoardServices() async {
 
     // 1. 从配置文件加载配置（开源友好：用户只需修改 xboard.config.yaml）
     final configSettings = await ConfigFileLoader.loadFromFile();
-    print('[Main] 配置文件加载成功，Provider: ${configSettings.currentProvider}');
+    print(
+      '[Main] bootstrap config loaded, provider: ${configSettings.currentProvider}, bootstrap: ${configSettings.bootstrapConfig.remoteUrl ?? "local"}',
+    );
 
     // 2. 加载安全配置（UA、证书、解密密钥等）
     await _loadSecurityConfig();
@@ -121,7 +122,6 @@ Future<void> _initializeXBoardServices() async {
     print('[Main] XBoard初始化异常堆栈: $stackTrace');
   }
 }
-
 
 // 创建一个 AppLifecycleObserver 类来处理应用生命周期事件
 class AppLifecycleObserver extends WidgetsBindingObserver {

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/xboard/features/auth/providers/xboard_user_provider.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -19,15 +20,15 @@ class XBoardHomePage extends ConsumerStatefulWidget {
   @override
   ConsumerState<XBoardHomePage> createState() => _XBoardHomePageState();
 }
-class _XBoardHomePageState extends ConsumerState<XBoardHomePage> 
+class _XBoardHomePageState extends ConsumerState<XBoardHomePage>
     with AutomaticKeepAliveClientMixin {
   bool _hasInitialized = false;
   bool _hasStartedLatencyTesting = false;
   bool _hasCheckedSubscriptionStatus = false;
-  
+
   @override
   bool get wantKeepAlive => true;  // 保持页面状态，防止重建
-  
+
   @override
   void initState() {
     super.initState();
@@ -49,7 +50,7 @@ class _XBoardHomePageState extends ConsumerState<XBoardHomePage>
         });
       }
     });
-    
+
     // 监听订阅导入完成事件
     ref.listenManual(profileImportProvider, (previous, next) {
       // 从导入中变为完成（成功或失败）
@@ -62,7 +63,7 @@ class _XBoardHomePageState extends ConsumerState<XBoardHomePage>
         });
       }
     });
-    
+
     ref.listenManual(currentProfileProvider, (previous, next) {
       if (previous?.label != next?.label && previous != null) {
         Future.delayed(const Duration(milliseconds: 1500), () {
@@ -86,40 +87,44 @@ class _XBoardHomePageState extends ConsumerState<XBoardHomePage>
   @override
   Widget build(BuildContext context) {
     super.build(context);  // 必须调用，配合 AutomaticKeepAliveClientMixin
-    
+
     final appLocalizations = AppLocalizations.of(context);
     // 根据操作系统平台判断设备类型
     final isDesktop = Platform.isLinux || Platform.isWindows || Platform.isMacOS;
-    
+
     return Scaffold(
       appBar: isDesktop ? null : AppBar(
         automaticallyImplyLeading: false,
         leadingWidth: 120,
-        leading: TextButton.icon(
-          icon: const Icon(Icons.support_agent, size: 20),
-          label: Text(appLocalizations.onlineSupport),
+        leading: CupertinoButton(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           onPressed: () {
             // 移动端独有的按钮，使用 push 创建路由栈
             context.push('/support');
           },
-          style: TextButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            minimumSize: Size.zero,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(CupertinoIcons.chat_bubble_text, size: 20),
+              const SizedBox(width: 4),
+              Flexible(child: Text(appLocalizations.onlineSupport, style: const TextStyle(fontSize: 14))),
+            ],
           ),
         ),
         actions: [
-          TextButton.icon(
-            icon: const Icon(Icons.card_giftcard, size: 20),
-            label: Text(appLocalizations.xboardPlanInfo),
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             onPressed: () {
               // 移动端独有的按钮，使用 push 创建路由栈
               context.push('/plans');
             },
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(CupertinoIcons.gift, size: 20),
+                const SizedBox(width: 4),
+                Text(appLocalizations.xboardPlanInfo, style: const TextStyle(fontSize: 14)),
+              ],
             ),
           ),
         ],
@@ -132,12 +137,12 @@ class _XBoardHomePageState extends ConsumerState<XBoardHomePage>
         final statusBarHeight = MediaQuery.of(context).padding.top;
         final bottomNavHeight = 60.0; // 底部导航栏高度
         final availableHeight = screenHeight - appBarHeight - statusBarHeight - bottomNavHeight;
-        
+
         // 根据可用高度调整间距
         double sectionSpacing;
         double verticalPadding;
         double horizontalPadding;
-        
+
         if (availableHeight < 500) {
           // 小屏幕：紧凑布局
           sectionSpacing = 8.0;
@@ -154,15 +159,15 @@ class _XBoardHomePageState extends ConsumerState<XBoardHomePage>
           verticalPadding = 12.0;
           horizontalPadding = 16.0;
         }
-        
+
         return Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                Theme.of(context).colorScheme.surface,
+                CupertinoDynamicColor.resolve(CupertinoColors.secondarySystemGroupedBackground, context).withValues(alpha: 0.3),
+                CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context),
               ],
             ),
           ),
@@ -246,20 +251,47 @@ class _XBoardHomePageState extends ConsumerState<XBoardHomePage>
     return Consumer(
       builder: (context, ref, child) {
         final enabled = ref.watch(appSettingProvider.select((s) => s.autoLaunch));
-        return Card(
-          elevation: 0,
-          child: ListTile(
-            leading: const Icon(Icons.power_settings_new),
-            title: Text(appLocalizations.autoLaunch),
-            subtitle: Text(appLocalizations.autoLaunchDesc),
-            trailing: Switch(
-              value: enabled,
-              onChanged: (value) {
-                ref.read(appSettingProvider.notifier).updateState(
-                      (state) => state.copyWith(autoLaunch: value),
-                    );
-              },
-            ),
+        return Container(
+          decoration: BoxDecoration(
+            color: CupertinoDynamicColor.resolve(CupertinoColors.secondarySystemGroupedBackground, context),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Icon(CupertinoIcons.power, color: CupertinoDynamicColor.resolve(CupertinoColors.label, context)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      appLocalizations.autoLaunch,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: CupertinoDynamicColor.resolve(CupertinoColors.label, context),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      appLocalizations.autoLaunchDesc,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              CupertinoSwitch(
+                value: enabled,
+                onChanged: (value) {
+                  ref.read(appSettingProvider.notifier).updateState(
+                        (state) => state.copyWith(autoLaunch: value),
+                      );
+                },
+              ),
+            ],
           ),
         );
       },
@@ -269,28 +301,28 @@ class _XBoardHomePageState extends ConsumerState<XBoardHomePage>
   /// 如果3秒后还没有触发导入完成监听器，则主动检查
   void _waitForSubscriptionImportThenCheck() async {
     await Future.delayed(const Duration(seconds: 3));
-    
+
     // 如果已经通过监听器检查过了，就不再检查
     if (_hasCheckedSubscriptionStatus) {
       return;
     }
-    
+
     _hasCheckedSubscriptionStatus = true;
     if (mounted) {
       subscriptionStatusChecker.checkSubscriptionStatusOnStartup(context, ref);
     }
   }
-  
+
   void _showTokenExpiredDialog() {
     if (!mounted) return;
-    showDialog(
+    showCupertinoDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      builder: (context) => CupertinoAlertDialog(
         title: Text(appLocalizations.xboardTokenExpiredTitle),
         content: Text(appLocalizations.xboardTokenExpiredContent),
         actions: [
-          TextButton(
+          CupertinoDialogAction(
             onPressed: () async {
               final userNotifier = ref.read(xboardUserProvider.notifier);
               // 先关闭对话框
@@ -350,4 +382,4 @@ class _XBoardHomePageState extends ConsumerState<XBoardHomePage>
       }
     });
   }
-} 
+}

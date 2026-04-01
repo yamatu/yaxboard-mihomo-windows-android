@@ -1,1 +1,0 @@
-cargo:rustc-env=MIME_TYPES_GENERATED_PATH=C:\Users\98434\Desktop\Xboard-Mihomo\services\helper\target\release\build\mime_guess-9bac0d04a7b0d79b\out\mime_types_generated.rs

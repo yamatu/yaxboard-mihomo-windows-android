@@ -3,6 +3,7 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -51,19 +52,17 @@ class _NetworkDetectionState extends ConsumerState<NetworkDetection> {
                               _countryCodeToEmoji(
                                 ipInfo.countryCode,
                               ),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.toLight
-                                  .copyWith(
-                                    fontFamily: FontFamily.twEmoji.value,
-                                  ),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w300,
+                                fontFamily: FontFamily.twEmoji.value,
+                                color: CupertinoDynamicColor.resolve(CupertinoColors.label, context),
+                              ),
                             )
                           : Icon(
-                              Icons.network_check,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
+                              CupertinoIcons.wifi,
+                              color: CupertinoDynamicColor.resolve(
+                                  CupertinoColors.secondaryLabel, context),
                             ),
                       const SizedBox(
                         width: 8,
@@ -75,19 +74,18 @@ class _NetworkDetectionState extends ConsumerState<NetworkDetection> {
                             appLocalizations.networkDetection,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleSmall
-                                ?.copyWith(
-                                  color: context.colorScheme.onSurfaceVariant,
-                                ),
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
+                            ),
                           ),
                         ),
                       ),
                       SizedBox(width: 2),
                       AspectRatio(
                         aspectRatio: 1,
-                        child: IconButton(
+                        child: CupertinoButton(
                           padding: EdgeInsets.zero,
                           onPressed: () {
                             globalState.showMessage(
@@ -98,10 +96,10 @@ class _NetworkDetectionState extends ConsumerState<NetworkDetection> {
                               cancelable: false,
                             );
                           },
-                          icon: Icon(
+                          child: Icon(
                             size: 16.ap,
-                            Icons.info_outline,
-                            color: context.colorScheme.onSurfaceVariant,
+                            CupertinoIcons.info,
+                            color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
                           ),
                         ),
                       )
@@ -139,9 +137,7 @@ class _NetworkDetectionState extends ConsumerState<NetworkDetection> {
                                       padding: const EdgeInsets.all(2),
                                       child: const AspectRatio(
                                         aspectRatio: 1,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
+                                        child: CupertinoActivityIndicator(),
                                       ),
                                     ),
                             ),

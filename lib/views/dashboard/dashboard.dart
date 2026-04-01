@@ -7,6 +7,7 @@ import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:fl_clash/xboard/features/shared/widgets/node_selector_bar.dart';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -70,23 +71,25 @@ class _DashboardViewState extends ConsumerState<DashboardView> with PageMixin {
                     }
                     return child!;
                   },
-                  child: IconButton(
+                  child: CupertinoButton(
+                    padding: EdgeInsets.zero,
                     onPressed: () {
                       _showAddWidgetsModal();
                     },
-                    icon: Icon(
-                      Icons.add_circle,
+                    child: Icon(
+                      CupertinoIcons.add_circled_solid,
                     ),
                   ),
                 )
               : SizedBox();
         }),
-        IconButton(
-          icon: _buildIsEdit((isEdit) {
+        CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: _buildIsEdit((isEdit) {
             return isEdit
-                ? Icon(Icons.save)
+                ? Icon(CupertinoIcons.checkmark)
                 : Icon(
-                    Icons.edit,
+                    CupertinoIcons.pencil,
                   );
           }),
           onPressed: _handleUpdateIsEdit,
@@ -312,12 +315,13 @@ class _AddedContainerState extends State<_AddedContainer> {
             child: SizedBox(
               width: 24,
               height: 24,
-              child: IconButton.filled(
-                iconSize: 20,
+              child: CupertinoButton(
                 padding: EdgeInsets.all(2),
+                minSize: 20,
                 onPressed: _handleAdd,
-                icon: Icon(
-                  Icons.add,
+                child: Icon(
+                  CupertinoIcons.add,
+                  size: 20,
                 ),
               ),
             ),

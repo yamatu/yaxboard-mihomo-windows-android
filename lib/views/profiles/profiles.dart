@@ -9,6 +9,7 @@ import 'package:fl_clash/views/profiles/edit_profile.dart';
 import 'package:fl_clash/views/profiles/override_profile.dart';
 import 'package:fl_clash/views/profiles/scripts.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -77,13 +78,15 @@ class _ProfilesViewState extends State<ProfilesView> with PageMixin {
 
   @override
   List<Widget> get actions => [
-        IconButton(
+        CupertinoButton(
+          padding: EdgeInsets.zero,
           onPressed: () {
             _updateProfiles();
           },
-          icon: const Icon(Icons.sync),
+          child: const Icon(CupertinoIcons.arrow_2_circlepath),
         ),
-        IconButton(
+        CupertinoButton(
+          padding: EdgeInsets.zero,
           onPressed: () {
             showExtend(
               context,
@@ -92,18 +95,19 @@ class _ProfilesViewState extends State<ProfilesView> with PageMixin {
               },
             );
           },
-          icon: Consumer(
+          child: Consumer(
             builder: (context, ref, __) {
               final isScriptMode = ref.watch(
                   scriptStateProvider.select((state) => state.realId != null));
               return Icon(
-                Icons.functions,
+                CupertinoIcons.function,
                 color: isScriptMode ? context.colorScheme.primary : null,
               );
             },
           ),
         ),
-        IconButton(
+        CupertinoButton(
+          padding: EdgeInsets.zero,
           onPressed: () {
             final profiles = globalState.config.profiles;
             showSheet(
@@ -116,17 +120,19 @@ class _ProfilesViewState extends State<ProfilesView> with PageMixin {
               },
             );
           },
-          icon: const Icon(Icons.sort),
-          iconSize: 26,
+          child: const Icon(CupertinoIcons.sort_down, size: 26),
         ),
       ];
 
   @override
-  Widget? get floatingActionButton => FloatingActionButton(
-        heroTag: null,
+  Widget? get floatingActionButton => CupertinoButton(
+        padding: const EdgeInsets.all(16),
+        color: context.colorScheme.primary,
+        borderRadius: BorderRadius.circular(28),
         onPressed: _handleShowAddExtendPage,
-        child: const Icon(
-          Icons.add,
+        child: Icon(
+          CupertinoIcons.add,
+          color: context.colorScheme.onPrimary,
         ),
       );
 
@@ -334,13 +340,13 @@ class ProfileItem extends StatelessWidget {
             child: profile.isUpdating
                 ? const Padding(
                     padding: EdgeInsets.all(8),
-                    child: CircularProgressIndicator(),
+                    child: CupertinoActivityIndicator(),
                   )
                 : CommonPopupBox(
                     popup: CommonPopupMenu(
                       items: [
                         PopupMenuItemData(
-                          icon: Icons.edit_outlined,
+                          icon: CupertinoIcons.pencil,
                           label: appLocalizations.edit,
                           onPressed: () {
                             _handleShowEditExtendPage(context);
@@ -348,7 +354,7 @@ class ProfileItem extends StatelessWidget {
                         ),
                         if (profile.type == ProfileType.url) ...[
                           PopupMenuItemData(
-                            icon: Icons.sync_alt_sharp,
+                            icon: CupertinoIcons.arrow_2_circlepath,
                             label: appLocalizations.sync,
                             onPressed: () {
                               updateProfile();
@@ -356,21 +362,21 @@ class ProfileItem extends StatelessWidget {
                           ),
                         ],
                         PopupMenuItemData(
-                          icon: Icons.extension_outlined,
+                          icon: CupertinoIcons.puzzle,
                           label: appLocalizations.override,
                           onPressed: () {
                             _handlePushGenProfilePage(context, profile.id);
                           },
                         ),
                         PopupMenuItemData(
-                          icon: Icons.file_copy_outlined,
+                          icon: CupertinoIcons.doc_on_doc,
                           label: appLocalizations.exportFile,
                           onPressed: () {
                             _handleExportFile(context);
                           },
                         ),
                         PopupMenuItemData(
-                          icon: Icons.delete_outlined,
+                          icon: CupertinoIcons.delete,
                           label: appLocalizations.delete,
                           onPressed: () {
                             _handleDeleteProfile(context);
@@ -379,11 +385,12 @@ class ProfileItem extends StatelessWidget {
                       ],
                     ),
                     targetBuilder: (open) {
-                      return IconButton(
+                      return CupertinoButton(
+                        padding: EdgeInsets.zero,
                         onPressed: () {
                           open();
                         },
-                        icon: Icon(Icons.more_vert),
+                        child: Icon(CupertinoIcons.ellipsis_vertical),
                       );
                     },
                   ),
@@ -483,13 +490,14 @@ class _ReorderableProfilesSheetState extends State<ReorderableProfilesSheet> {
     return AdaptiveSheetScaffold(
       type: widget.type,
       actions: [
-        IconButton(
+        CupertinoButton(
+          padding: EdgeInsets.zero,
           onPressed: () {
             Navigator.of(context).pop();
             globalState.appController.setProfiles(profiles);
           },
-          icon: Icon(
-            Icons.save,
+          child: Icon(
+            CupertinoIcons.floppy_disk,
           ),
         )
       ],
@@ -528,7 +536,7 @@ class _ReorderableProfilesSheetState extends State<ReorderableProfilesSheet> {
                   title: Text(profile.label ?? profile.id),
                   trailing: ReorderableDragStartListener(
                     index: index,
-                    child: const Icon(Icons.drag_handle),
+                    child: const Icon(CupertinoIcons.line_horizontal_3),
                   ),
                 ),
               ),

@@ -9,6 +9,7 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/pages/editor.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class EditProfileView extends StatefulWidget {
@@ -313,12 +314,12 @@ class _EditProfileViewState extends State<EditProfileView> {
                           spacing: 12,
                           children: [
                             CommonChip(
-                              avatar: const Icon(Icons.edit),
+                              avatar: const Icon(CupertinoIcons.pencil),
                               label: appLocalizations.edit,
                               onPressed: _editProfileFile,
                             ),
                             CommonChip(
-                              avatar: const Icon(Icons.upload),
+                              avatar: const Icon(CupertinoIcons.cloud_upload),
                               label: appLocalizations.upload,
                               onPressed: _uploadProfileFile,
                             ),
@@ -341,11 +342,19 @@ class _EditProfileViewState extends State<EditProfileView> {
       },
       child: FloatLayout(
         floatingWidget: FloatWrapper(
-          child: FloatingActionButton.extended(
-            heroTag: null,
+          child: CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            color: context.colorScheme.primary,
+            borderRadius: BorderRadius.circular(28),
             onPressed: _handleConfirm,
-            label: Text(appLocalizations.save),
-            icon: const Icon(Icons.save),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(CupertinoIcons.floppy_disk, color: context.colorScheme.onPrimary),
+                const SizedBox(width: 8),
+                Text(appLocalizations.save, style: TextStyle(color: context.colorScheme.onPrimary)),
+              ],
+            ),
           ),
         ),
         child: Form(

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:fl_clash/xboard/utils/xboard_notification.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_clash/common/common.dart';
@@ -15,7 +15,7 @@ class _WithdrawDialogState extends ConsumerState<WithdrawDialog> {
   final TextEditingController _accountController = TextEditingController();
   bool _isWithdrawing = false;
   bool _isSuccess = false;
-  
+
   // 提现方式列表
   // TODO: 未来可以通过 SystemConfig API 从后端获取: config.withdrawMethods
   // 接口: /api/v1/user/comm/config -> SystemConfig.withdrawMethods
@@ -33,32 +33,33 @@ class _WithdrawDialogState extends ConsumerState<WithdrawDialog> {
     final inviteState = ref.read(inviteProvider);
     final double availableAmount = inviteState.availableCommission;  // 已经是元，不需要再除以100
 
-    return AlertDialog(
+    return CupertinoAlertDialog(
       title: Text(appLocalizations.withdrawCommission),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          const SizedBox(height: 8),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
             child: _isSuccess
                 ? const Icon(
-                    Icons.check_circle,
+                    CupertinoIcons.checkmark_circle_fill,
                     size: 48,
-                    color: Colors.green,
+                    color: CupertinoColors.activeGreen,
                     key: ValueKey('success'),
                   )
                 : _isWithdrawing
                     ? const SizedBox(
                         width: 48,
                         height: 48,
-                        child: CircularProgressIndicator(
+                        child: CupertinoActivityIndicator(
                           key: ValueKey('loading'),
                         ),
                       )
                     : const Icon(
-                        Icons.account_balance_wallet,
+                        CupertinoIcons.money_dollar_circle,
                         size: 48,
-                        color: Colors.blue,
+                        color: CupertinoColors.activeBlue,
                         key: ValueKey('wallet'),
                       ),
           ),
@@ -71,7 +72,7 @@ class _WithdrawDialogState extends ConsumerState<WithdrawDialog> {
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.green,
+                      color: CupertinoColors.activeGreen,
                     ),
                     key: const ValueKey('success-text'),
                   )
@@ -95,42 +96,22 @@ class _WithdrawDialogState extends ConsumerState<WithdrawDialog> {
           ),
           const SizedBox(height: 16),
           if (!_isWithdrawing && !_isSuccess) ...[
-            DropdownButtonFormField<String>(
-              value: _selectedMethod,
-              decoration: InputDecoration(
-                labelText: '提现方式',
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.payment),
-              ),
-              items: _withdrawMethods.map((String method) {
-                return DropdownMenuItem<String>(
-                  value: method,
-                  child: Text(method),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                setState(() {
-                  _selectedMethod = newValue;
-                });
-              },
-              hint: const Text('请选择提现方式'),
-            ),
+            _buildMethodPicker(context),
             const SizedBox(height: 12),
-            TextField(
+            CupertinoTextField(
               controller: _accountController,
-              decoration: InputDecoration(
-                labelText: '提现账号',
-                hintText: '请输入您的账号',
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.account_box),
+              placeholder: '请输入您的账号',
+              prefix: const Padding(
+                padding: EdgeInsets.only(left: 8),
+                child: Icon(CupertinoIcons.person_crop_square, size: 20),
               ),
             ),
             const SizedBox(height: 12),
             Text(
               '提现申请将通过工单系统提交，请等待管理员审核',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey,
+                color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
               ),
               textAlign: TextAlign.center,
             ),
@@ -139,16 +120,72 @@ class _WithdrawDialogState extends ConsumerState<WithdrawDialog> {
       ),
       actions: [
         if (!_isWithdrawing && !_isSuccess) ...[
-          TextButton(
+          CupertinoDialogAction(
             onPressed: () => Navigator.of(context).pop(),
             child: Text(appLocalizations.cancel),
           ),
-          ElevatedButton(
+          CupertinoDialogAction(
+            isDefaultAction: true,
             onPressed: _performWithdraw,
             child: const Text('提交申请'),
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildMethodPicker(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        showCupertinoModalPopup(
+          context: context,
+          builder: (BuildContext popupContext) => CupertinoActionSheet(
+            title: const Text('请选择提现方式'),
+            actions: _withdrawMethods.map((String method) {
+              return CupertinoActionSheetAction(
+                onPressed: () {
+                  setState(() {
+                    _selectedMethod = method;
+                  });
+                  Navigator.of(popupContext).pop();
+                },
+                child: Text(method),
+              );
+            }).toList(),
+            cancelButton: CupertinoActionSheetAction(
+              onPressed: () => Navigator.of(popupContext).pop(),
+              child: Text(appLocalizations.cancel),
+            ),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: CupertinoDynamicColor.resolve(CupertinoColors.separator, context),
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              _selectedMethod ?? '请选择提现方式',
+              style: TextStyle(
+                color: _selectedMethod != null
+                    ? CupertinoDynamicColor.resolve(CupertinoColors.label, context)
+                    : CupertinoDynamicColor.resolve(CupertinoColors.placeholderText, context),
+              ),
+            ),
+            Icon(
+              CupertinoIcons.chevron_down,
+              size: 16,
+              color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -159,7 +196,7 @@ class _WithdrawDialogState extends ConsumerState<WithdrawDialog> {
       }
       return;
     }
-    
+
     final account = _accountController.text.trim();
     if (account.isEmpty) {
       if (mounted) {
@@ -167,23 +204,23 @@ class _WithdrawDialogState extends ConsumerState<WithdrawDialog> {
       }
       return;
     }
-    
+
     setState(() {
       _isWithdrawing = true;
     });
-    
+
     try {
       final result = await ref.read(inviteProvider.notifier).withdrawCommission(
         withdrawMethod: _selectedMethod!,
         withdrawAccount: account,
       );
-      
+
       if (mounted) {
         setState(() {
           _isWithdrawing = false;
           _isSuccess = result;
         });
-        
+
         if (result) {
           // 成功后显示动画，然后自动关闭
           await Future.delayed(const Duration(milliseconds: 1500));

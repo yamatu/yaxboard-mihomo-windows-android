@@ -4,6 +4,7 @@ export 'color.dart';
 export 'constant.dart';
 export 'context.dart';
 export 'converter.dart';
+export 'cupertino_colors.dart';
 export 'datetime.dart';
 export 'fixed.dart';
 export 'function.dart';

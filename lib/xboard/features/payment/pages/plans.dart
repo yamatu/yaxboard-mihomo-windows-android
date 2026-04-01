@@ -5,6 +5,7 @@ import 'package:fl_clash/xboard/features/auth/providers/xboard_user_provider.dar
 import 'package:fl_clash/xboard/features/subscription/providers/xboard_subscription_provider.dart';
 import 'plan_purchase_page.dart';
 import '../widgets/plan_description_widget.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,27 +17,27 @@ class PlansView extends ConsumerStatefulWidget {
 class _PlansViewState extends ConsumerState<PlansView> {
   DomainPlan? _selectedPlan; // 桌面端选中的套餐
   bool _hasCheckedUrlParams = false; // 标记是否已检查URL参数
-  
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final subscriptionNotifier = ref.read(xboardSubscriptionProvider.notifier);
       subscriptionNotifier.autoRefreshIfNeeded();
-      
+
       // 检查URL参数中是否有planId
       _checkUrlParams();
     });
   }
-  
+
   void _checkUrlParams() {
     if (_hasCheckedUrlParams) return;
     _hasCheckedUrlParams = true;
-    
+
     // 获取URL参数
     final state = GoRouterState.of(context);
     final planIdStr = state.uri.queryParameters['planId'];
-    
+
     if (planIdStr != null) {
       final planId = int.tryParse(planIdStr);
       if (planId != null) {
@@ -48,7 +49,7 @@ class _PlansViewState extends ConsumerState<PlansView> {
         } catch (e) {
           plan = null;
         }
-        
+
         if (plan != null) {
           // UI层：从URL参数选中套餐
           setState(() {
@@ -58,12 +59,12 @@ class _PlansViewState extends ConsumerState<PlansView> {
       }
     }
   }
-  
+
   Future<void> _refreshPlans() async {
     final subscriptionNotifier = ref.read(xboardSubscriptionProvider.notifier);
     await subscriptionNotifier.refreshPlans();
   }
-  
+
   void _backToPlans() {
     setState(() {
       _selectedPlan = null;
@@ -101,10 +102,14 @@ class _PlansViewState extends ConsumerState<PlansView> {
   Widget _buildPlanCard(DomainPlan plan) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth > 768;
-    return Card(
-      margin: isDesktop 
-        ? EdgeInsets.zero 
+    return Container(
+      margin: isDesktop
+        ? EdgeInsets.zero
         : const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      decoration: BoxDecoration(
+        color: CupertinoDynamicColor.resolve(CupertinoColors.secondarySystemGroupedBackground, context),
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: IntrinsicHeight(
         child: Padding(
         padding: EdgeInsets.all(isDesktop ? 12 : 16),
@@ -118,9 +123,10 @@ class _PlansViewState extends ConsumerState<PlansView> {
                 Expanded(
                   child: Text(
                     plan.name,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
+                      color: CupertinoDynamicColor.resolve(CupertinoColors.label, context),
                     ),
                   ),
                 ),
@@ -128,15 +134,15 @@ class _PlansViewState extends ConsumerState<PlansView> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.blue.shade400, Colors.blue.shade600],
+                      gradient: const LinearGradient(
+                        colors: [CupertinoColors.systemBlue, CupertinoColors.activeBlue],
                       ),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
                       _getLowestPrice(plan),
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: CupertinoColors.white,
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
@@ -147,18 +153,18 @@ class _PlansViewState extends ConsumerState<PlansView> {
             SizedBox(height: isDesktop ? 8 : 12),
             Row(
               children: [
-                Icon(Icons.data_usage, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                Icon(CupertinoIcons.chart_bar, size: 16, color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context)),
                 const SizedBox(width: 4),
                 Text(
                   '${AppLocalizations.of(context).xboardTraffic}: ${_formatTraffic(plan.transferQuota.toDouble())}',
-                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  style: TextStyle(color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context)),
                 ),
                 const SizedBox(width: 16),
-                Icon(Icons.speed, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                Icon(CupertinoIcons.speedometer, size: 16, color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context)),
                 const SizedBox(width: 4),
                 Text(
                   '${AppLocalizations.of(context).xboardSpeedLimit}: ${_getSpeedLimitText(plan)}',
-                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  style: TextStyle(color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context)),
                 ),
               ],
             ),
@@ -170,17 +176,21 @@ class _PlansViewState extends ConsumerState<PlansView> {
             if (plan.hasPrice)
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
+                child: CupertinoButton(
+                  color: CupertinoColors.systemBlue,
+                  padding: EdgeInsets.symmetric(vertical: isDesktop ? 8 : 12),
+                  borderRadius: BorderRadius.circular(8),
                   onPressed: () => _navigateToPurchase(plan),
-                  icon: const Icon(Icons.shopping_cart),
-                  label: Text(appLocalizations.xboardBuyNow),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(vertical: isDesktop ? 8 : 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(CupertinoIcons.cart, size: 18, color: CupertinoColors.white),
+                      const SizedBox(width: 6),
+                      Text(
+                        appLocalizations.xboardBuyNow,
+                        style: const TextStyle(color: CupertinoColors.white),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -193,7 +203,7 @@ class _PlansViewState extends ConsumerState<PlansView> {
   void _navigateToPurchase(DomainPlan plan) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth > 768;
-    
+
     if (isDesktop) {
       // 桌面端：内嵌显示
       setState(() {
@@ -202,7 +212,7 @@ class _PlansViewState extends ConsumerState<PlansView> {
     } else {
       // 移动端：使用 Navigator.push 导航，自动有返回按钮
       Navigator.of(context).push(
-        MaterialPageRoute(
+        CupertinoPageRoute(
           builder: (context) => PlanPurchasePage(plan: plan),
         ),
       );
@@ -212,15 +222,15 @@ class _PlansViewState extends ConsumerState<PlansView> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth > 768;
-    
+
     final scaffold = Scaffold(
       appBar: _selectedPlan != null && isDesktop
           // 桌面端购买页面：显示返回按钮的 AppBar
           ? AppBar(
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
+              leading: CupertinoButton(
+                padding: EdgeInsets.zero,
                 onPressed: _backToPlans,
-                tooltip: '返回',
+                child: const Icon(CupertinoIcons.back),
               ),
               title: Text(appLocalizations.xboardPurchaseSubscription),
               elevation: 0,
@@ -248,17 +258,17 @@ class _PlansViewState extends ConsumerState<PlansView> {
             final plans = ref.watch(xboardSubscriptionProvider);
             final uiState = ref.watch(userUIStateProvider);
             if (uiState.isLoading) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: CupertinoActivityIndicator());
             }
             if (uiState.errorMessage != null) {
               return Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(
-                      Icons.error_outline,
+                    Icon(
+                      CupertinoIcons.exclamationmark_circle,
                       size: 64,
-                      color: Colors.red,
+                      color: CupertinoDynamicColor.resolve(CupertinoColors.destructiveRed, context),
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -266,17 +276,19 @@ class _PlansViewState extends ConsumerState<PlansView> {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Colors.red.shade700,
+                        color: CupertinoDynamicColor.resolve(CupertinoColors.destructiveRed, context),
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       uiState.errorMessage!,
-                      style: const TextStyle(color: Colors.red),
+                      style: TextStyle(
+                        color: CupertinoDynamicColor.resolve(CupertinoColors.destructiveRed, context),
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 16),
-                    ElevatedButton(
+                    CupertinoButton.filled(
                       onPressed: _refreshPlans,
                       child: Text(appLocalizations.xboardRetry),
                     ),
@@ -285,21 +297,21 @@ class _PlansViewState extends ConsumerState<PlansView> {
               );
             }
             if (plans.isEmpty) {
-              return const Center(
+              return Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.inbox_outlined,
+                      CupertinoIcons.tray,
                       size: 64,
-                      color: Colors.grey,
+                      color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     Text(
                       '暂无套餐信息',
                       style: TextStyle(
                         fontSize: 18,
-                        color: Colors.grey,
+                        color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
                       ),
                     ),
                   ],
@@ -334,7 +346,7 @@ class _PlansViewState extends ConsumerState<PlansView> {
         ),
       ),
     );
-    
+
     // 移动端需要拦截返回按钮，桌面端直接返回 scaffold
     if (isDesktop) {
       return scaffold;

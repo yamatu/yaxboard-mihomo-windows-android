@@ -2,6 +2,7 @@ import 'package:fl_clash/xboard/features/auth/auth.dart';
 import 'package:fl_clash/xboard/infrastructure/providers/repository_providers.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:fl_clash/xboard/utils/xboard_notification.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_clash/xboard/features/shared/shared.dart';
@@ -176,14 +177,14 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   }
 
   void _showInviteCodeDialog() {
-    showDialog(
+    showCupertinoDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
+        return CupertinoAlertDialog(
           title: Text(appLocalizations.inviteCodeRequired),
           content: Text(appLocalizations.inviteCodeRequiredMessage),
           actions: [
-            TextButton(
+            CupertinoDialogAction(
               onPressed: () {
                 context.pop();
               },
@@ -197,23 +198,28 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final bgColor = CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context);
     final configAsync = ref.watch(configProvider);
-    
+
     // 处理异步加载状态
     return configAsync.when(
       loading: () => Scaffold(
-        backgroundColor: colorScheme.surface,
-        body: const Center(child: CircularProgressIndicator()),
+        backgroundColor: bgColor,
+        body: const Center(child: CupertinoActivityIndicator()),
       ),
-      error: (error, stack) => _buildPage(context, colorScheme, null),
-      data: (config) => _buildPage(context, colorScheme, config),
+      error: (error, stack) => _buildPage(context, null),
+      data: (config) => _buildPage(context, config),
     );
   }
   
-  Widget _buildPage(BuildContext context, ColorScheme colorScheme, ConfigData? config) {
+  Widget _buildPage(BuildContext context, ConfigData? config) {
+    final primaryColor = CupertinoTheme.of(context).primaryColor;
+    final labelColor = CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context);
+    final textColor = CupertinoDynamicColor.resolve(CupertinoColors.label, context);
+    final bgColor = CupertinoDynamicColor.resolve(CupertinoColors.systemBackground, context);
+
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: bgColor,
       body: XBContainer(
         child: Column(
           children: [
@@ -221,19 +227,25 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               padding: const EdgeInsets.all(16.0),
               child: Row(
                 children: [
-                  IconButton(
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
                     onPressed: () => context.pop(),
-                    icon: const Icon(Icons.arrow_back),
-                    style: IconButton.styleFrom(
-                      backgroundColor: colorScheme.surfaceContainerLow,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: CupertinoDynamicColor.resolve(CupertinoColors.tertiarySystemFill, context),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(CupertinoIcons.back, color: textColor),
                     ),
                   ),
                   const SizedBox(width: 16),
                   Text(
                     appLocalizations.createAccount,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: colorScheme.onSurface,
+                    style: TextStyle(
+                      fontSize: 28,
                       fontWeight: FontWeight.bold,
+                      color: textColor,
                     ),
                   ),
                 ],
@@ -251,8 +263,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       children: [
                         Text(
                           appLocalizations.fillInfoToRegister,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: labelColor,
                           ),
                         ),
                         const SizedBox(height: 32),
@@ -260,7 +273,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                           controller: _emailController,
                           labelText: appLocalizations.emailAddress,
                           hintText: appLocalizations.pleaseEnterYourEmailAddress,
-                          prefixIcon: Icons.email_outlined,
+                          prefixIcon: CupertinoIcons.mail,
                           keyboardType: TextInputType.emailAddress,
                           validator: (value) {
                             if (value == null || value.isEmpty) {
@@ -277,13 +290,15 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                           controller: _passwordController,
                           labelText: appLocalizations.password,
                           hintText: appLocalizations.pleaseEnterAtLeast8CharsPassword,
-                          prefixIcon: Icons.lock_outlined,
+                          prefixIcon: CupertinoIcons.lock,
                           obscureText: !_isPasswordVisible,
-                          suffixIcon: IconButton(
-                            icon: Icon(
+                          suffixIcon: CupertinoButton(
+                            padding: EdgeInsets.zero,
+                            child: Icon(
                               _isPasswordVisible
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
+                                  ? CupertinoIcons.eye
+                                  : CupertinoIcons.eye_slash,
+                              color: labelColor,
                             ),
                             onPressed: () {
                               setState(() {
@@ -306,13 +321,15 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                           controller: _confirmPasswordController,
                           labelText: appLocalizations.confirmNewPassword,
                           hintText: appLocalizations.pleaseReEnterPassword,
-                          prefixIcon: Icons.lock_outlined,
+                          prefixIcon: CupertinoIcons.lock,
                           obscureText: !_isConfirmPasswordVisible,
-                          suffixIcon: IconButton(
-                            icon: Icon(
+                          suffixIcon: CupertinoButton(
+                            padding: EdgeInsets.zero,
+                            child: Icon(
                               _isConfirmPasswordVisible
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
+                                  ? CupertinoIcons.eye
+                                  : CupertinoIcons.eye_slash,
+                              color: labelColor,
                             ),
                             onPressed: () {
                               setState(() {
@@ -339,15 +356,16 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                                     controller: _emailCodeController,
                                     labelText: appLocalizations.emailVerificationCode,
                                     hintText: appLocalizations.pleaseEnterEmailVerificationCode,
-                                    prefixIcon: Icons.verified_user_outlined,
+                                    prefixIcon: CupertinoIcons.checkmark_shield,
                                     keyboardType: TextInputType.number,
                                     suffixIcon: _isSendingEmailCode
                                         ? const SizedBox(
                                             width: 20,
                                             height: 20,
-                                            child: CircularProgressIndicator(strokeWidth: 2),
+                                            child: CupertinoActivityIndicator(),
                                           )
-                                        : TextButton(
+                                        : CupertinoButton(
+                                            padding: EdgeInsets.zero,
                                             onPressed: _sendEmailCode,
                                             child: Text(appLocalizations.sendVerificationCode),
                                           ),
@@ -368,10 +386,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                         XBInputField(
                           controller: _inviteCodeController,
                           labelText: (config?.isInviteForce ?? false)
-                              ? '${appLocalizations.xboardInviteCode} *' 
+                              ? '${appLocalizations.xboardInviteCode} *'
                               : appLocalizations.inviteCodeOptional,
                           hintText: appLocalizations.pleaseEnterInviteCode,
-                          prefixIcon: Icons.card_giftcard_outlined,
+                          prefixIcon: CupertinoIcons.gift,
                           enabled: true,
                         ),
                         const SizedBox(height: 32),
@@ -379,28 +397,19 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                           width: double.infinity,
                           height: 48,
                           child: _isRegistering
-                              ? ElevatedButton(
+                              ? CupertinoButton.filled(
                                   onPressed: null,
-                                  child: const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
+                                  padding: EdgeInsets.zero,
+                                  child: const CupertinoActivityIndicator(
+                                    color: CupertinoColors.white,
                                   ),
                                 )
-                              : ElevatedButton(
+                              : CupertinoButton.filled(
                                   onPressed: _register,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: colorScheme.primary,
-                                    foregroundColor: colorScheme.onPrimary,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
+                                  padding: EdgeInsets.zero,
                                   child: Text(
                                     appLocalizations.registerAccount,
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -413,16 +422,18 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                           children: [
                             Text(
                               appLocalizations.alreadyHaveAccount,
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: labelColor,
                               ),
                             ),
-                            TextButton(
+                            CupertinoButton(
+                              padding: EdgeInsets.zero,
                               onPressed: () => context.pop(),
                               child: Text(
                                 appLocalizations.loginNow,
                                 style: TextStyle(
-                                  color: colorScheme.primary,
+                                  color: primaryColor,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),

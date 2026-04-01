@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_clash/xboard/utils/xboard_notification.dart';
 import 'package:flutter/services.dart';
@@ -65,7 +66,7 @@ class _PlanPurchasePageState extends ConsumerState<PlanPurchasePage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final periods = _getAvailablePeriods(context);
-      if (periods.isNotEmpty && _selectedPeriod == null) {  
+      if (periods.isNotEmpty && _selectedPeriod == null) {
         setState(() {
           _selectedPeriod = periods.first['period'];
         });
@@ -89,7 +90,7 @@ class _PlanPurchasePageState extends ConsumerState<PlanPurchasePage> {
       final userRepo = ref.read(userRepositoryProvider);
       final result = await userRepo.getUserInfo();
       final userInfo = result.dataOrNull;
-      
+
       if (mounted) {
         setState(() => _userBalance = userInfo?.balanceInYuan);
       }
@@ -306,7 +307,7 @@ class _PlanPurchasePageState extends ConsumerState<PlanPurchasePage> {
       // 创建订单
       _logger.debug('[购买] 创建订单');
       PaymentWaitingManager.updateStep(PaymentStep.createOrder);
-      
+
       final paymentNotifier = ref.read(xboardPaymentProvider.notifier);
       tradeNo = await paymentNotifier.createOrder(
         planId: widget.plan.id,
@@ -335,13 +336,13 @@ class _PlanPurchasePageState extends ConsumerState<PlanPurchasePage> {
       final paymentRepo = ref.read(paymentRepositoryProvider);
       final paymentResult = await paymentRepo.getPaymentMethods();
       final paymentMethods = paymentResult.dataOrNull ?? [];
-      
+
       if (paymentMethods.isEmpty) {
         throw Exception('暂无可用的支付方式');
       }
-      
+
       DomainPaymentMethod? selectedMethod;
-      
+
       // 如果实付金额为0（余额完全抵扣），自动选择第一个支付方式，跳过用户选择
       if (actualPayAmount <= 0) {
         _logger.debug('[购买] 实付金额为0，自动选择第一个支付方式');
@@ -434,18 +435,18 @@ class _PlanPurchasePageState extends ConsumerState<PlanPurchasePage> {
         tradeNo: tradeNo,
       method: method.id.toString(),
       );
-      
+
     if (paymentResult == null) {
       throw Exception('支付失败: 支付请求返回空结果');
     }
-      
+
     if (!mounted) return;
-        
+
     final paymentType = paymentResult['type'] as int? ?? 0;
     final paymentData = paymentResult['data'];
-        
+
     _logger.debug('[支付] type=$paymentType, data=$paymentData (${paymentData.runtimeType})');
-        
+
     // type: -1 余额支付成功（data 是 bool）
     // type: 0 跳转支付（data 是 String）
     // type: 1 二维码支付（data 是 String）
@@ -468,17 +469,17 @@ class _PlanPurchasePageState extends ConsumerState<PlanPurchasePage> {
   Future<void> _handleBalancePaymentSuccess() async {
     _logger.debug('[支付] 余额支付成功');
           PaymentWaitingManager.hide();
-          
+
           try {
             final userProvider = ref.read(xboardUserProvider.notifier);
             userProvider.refreshSubscriptionInfoAfterPayment();
           } catch (e) {
       _logger.debug('[余额支付] 刷新订阅信息失败: $e');
           }
-          
+
           if (mounted) {
             XBoardNotification.showSuccess(AppLocalizations.of(context).xboardPaymentSuccess);
-            
+
             Future.delayed(const Duration(milliseconds: 500), () {
               if (mounted) {
                 try {
@@ -590,32 +591,20 @@ class _PlanPurchasePageState extends ConsumerState<PlanPurchasePage> {
               child: Consumer(
                 builder: (context, ref, child) {
                   final paymentState = ref.watch(userUIStateProvider);
-                  return ElevatedButton(
-                      onPressed: paymentState.isLoading ? null : _proceedToPurchase,
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue.shade600,
-                      foregroundColor: Colors.white,
-                        elevation: 0,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
+                  return CupertinoButton(
+                    color: CupertinoColors.systemBlue,
+                    disabledColor: CupertinoColors.systemBlue.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(14),
+                    onPressed: paymentState.isLoading ? null : _proceedToPurchase,
                     child: paymentState.isLoading
                         ? Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
-                              ),
+                              const CupertinoActivityIndicator(color: CupertinoColors.white),
                                 const SizedBox(width: 12),
                                 Text(
                                   AppLocalizations.of(context).xboardProcessing,
-                                  style: const TextStyle(fontSize: 16),
+                                  style: const TextStyle(fontSize: 16, color: CupertinoColors.white),
                                 ),
                             ],
                           )
@@ -625,6 +614,7 @@ class _PlanPurchasePageState extends ConsumerState<PlanPurchasePage> {
                                 fontSize: 17,
                               fontWeight: FontWeight.bold,
                                 letterSpacing: 0.5,
+                                color: CupertinoColors.white,
                             ),
                           ),
                   );
@@ -651,5 +641,4 @@ class _PlanPurchasePageState extends ConsumerState<PlanPurchasePage> {
       body: content,
     );
   }
-} 
-
+}

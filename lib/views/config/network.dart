@@ -6,6 +6,7 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -235,7 +236,8 @@ class BypassDomainItem extends StatelessWidget {
   _initActions(BuildContext context, WidgetRef ref) {
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
       context.commonScaffoldState?.actions = [
-        IconButton(
+        CupertinoButton(
+          padding: EdgeInsets.zero,
           onPressed: () async {
             final res = await globalState.showMessage(
               title: appLocalizations.reset,
@@ -252,9 +254,8 @@ class BypassDomainItem extends StatelessWidget {
                   ),
                 );
           },
-          tooltip: appLocalizations.reset,
-          icon: const Icon(
-            Icons.replay,
+          child: const Icon(
+            CupertinoIcons.arrow_counterclockwise,
           ),
         )
       ];
@@ -408,7 +409,8 @@ class NetworkListView extends ConsumerWidget {
   _initActions(BuildContext context, WidgetRef ref) {
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
       context.commonScaffoldState?.actions = [
-        IconButton(
+        CupertinoButton(
+          padding: EdgeInsets.zero,
           onPressed: () async {
             final res = await globalState.showMessage(
               title: appLocalizations.reset,
@@ -430,9 +432,8 @@ class NetworkListView extends ConsumerWidget {
                   ),
                 );
           },
-          tooltip: appLocalizations.reset,
-          icon: const Icon(
-            Icons.replay,
+          child: const Icon(
+            CupertinoIcons.arrow_counterclockwise,
           ),
         )
       ];

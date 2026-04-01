@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+
 class XBInputField extends StatelessWidget {
   final TextEditingController controller;
   final String labelText;
@@ -25,7 +27,14 @@ class XBInputField extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final primaryColor = CupertinoTheme.of(context).primaryColor;
+    final labelColor = CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context);
+    final textColor = CupertinoDynamicColor.resolve(CupertinoColors.label, context);
+    final placeholderColor = CupertinoDynamicColor.resolve(CupertinoColors.placeholderText, context);
+    final fillColor = CupertinoDynamicColor.resolve(CupertinoColors.tertiarySystemFill, context);
+    final borderColor = CupertinoDynamicColor.resolve(CupertinoColors.separator, context);
+
+    // Keep TextFormField for Form validation support, but style it Cupertino
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
@@ -33,8 +42,9 @@ class XBInputField extends StatelessWidget {
       validator: validator,
       onChanged: onChanged,
       enabled: enabled,
-      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-        color: colorScheme.onSurface,
+      style: TextStyle(
+        fontSize: 16,
+        color: textColor,
       ),
       decoration: InputDecoration(
         labelText: labelText,
@@ -42,49 +52,49 @@ class XBInputField extends StatelessWidget {
         prefixIcon: prefixIcon != null
             ? Icon(
                 prefixIcon,
-                color: colorScheme.onSurfaceVariant,
+                color: labelColor,
               )
             : null,
         suffixIcon: suffixIcon,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(
-            color: colorScheme.outline,
+            color: borderColor,
           ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(
-            color: colorScheme.outline,
+            color: borderColor,
           ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(
-            color: colorScheme.primary,
+            color: primaryColor,
             width: 2,
           ),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(
-            color: colorScheme.error,
+            color: CupertinoDynamicColor.resolve(CupertinoColors.destructiveRed, context),
           ),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(
-            color: colorScheme.error,
+            color: CupertinoDynamicColor.resolve(CupertinoColors.destructiveRed, context),
             width: 2,
           ),
         ),
         filled: true,
-        fillColor: colorScheme.surfaceContainerLow,
+        fillColor: fillColor,
         labelStyle: TextStyle(
-          color: colorScheme.onSurfaceVariant,
+          color: labelColor,
         ),
         hintStyle: TextStyle(
-          color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+          color: placeholderColor,
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,

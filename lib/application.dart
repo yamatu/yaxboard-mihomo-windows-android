@@ -9,6 +9,7 @@ import 'package:fl_clash/manager/manager.dart';
 import 'package:fl_clash/plugins/app.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -37,10 +38,11 @@ class ApplicationState extends ConsumerState<Application> {
 
   final _pageTransitionsTheme = const PageTransitionsTheme(
     builders: <TargetPlatform, PageTransitionsBuilder>{
-      TargetPlatform.android: CommonPageTransitionsBuilder(),
-      TargetPlatform.windows: CommonPageTransitionsBuilder(),
-      TargetPlatform.linux: CommonPageTransitionsBuilder(),
-      TargetPlatform.macOS: CommonPageTransitionsBuilder(),
+      TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+      TargetPlatform.windows: CupertinoPageTransitionsBuilder(),
+      TargetPlatform.linux: CupertinoPageTransitionsBuilder(),
+      TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+      TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
     },
   );
 
@@ -48,7 +50,59 @@ class ApplicationState extends ConsumerState<Application> {
     required Brightness brightness,
     int? primaryColor,
   }) {
-    return ref.read(genColorSchemeProvider(brightness));
+    final baseScheme = ref.read(genColorSchemeProvider(brightness));
+    return baseScheme.copyWith(
+      primary: baseScheme.primary.darken(8),
+      primaryContainer: baseScheme.primaryContainer.darken(6),
+      secondaryContainer: baseScheme.secondaryContainer.darken(7),
+      tertiaryContainer: baseScheme.tertiaryContainer.darken(5),
+    );
+  }
+
+  ThemeData _buildTheme(ColorScheme colorScheme) {
+    final filledColor = colorScheme.primary.darken(4);
+    final tonalColor = colorScheme.secondaryContainer.darken(6);
+    return ThemeData(
+      useMaterial3: true,
+      pageTransitionsTheme: _pageTransitionsTheme,
+      colorScheme: colorScheme,
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: filledColor,
+          foregroundColor: colorScheme.onPrimary,
+        ).copyWith(
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.disabled)) {
+              return filledColor.opacity38;
+            }
+            if (states.contains(WidgetState.pressed)) {
+              return filledColor.darken(6);
+            }
+            if (states.contains(WidgetState.hovered)) {
+              return filledColor.darken(2);
+            }
+            return filledColor;
+          }),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: filledColor,
+          foregroundColor: colorScheme.onPrimary,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: filledColor,
+          side: BorderSide(
+            color: filledColor.opacity60,
+          ),
+        ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        indicatorColor: tonalColor,
+      ),
+    );
   }
 
   @override
@@ -123,7 +177,7 @@ class ApplicationState extends ConsumerState<Application> {
             showDialog(
               context: currentContext,
               barrierDismissible: !updateState.forceUpdate, // 强制更新时不能取消
-              builder: (context) => UpdateDialog(state: updateState),
+              builder: (context) => const UpdateDialog(),
             );
           }
         } else if (updateState.error != null) {
@@ -234,10 +288,28 @@ class ApplicationState extends ConsumerState<Application> {
                 GlobalCupertinoLocalizations.delegate,
                 GlobalWidgetsLocalizations.delegate
               ],
-              builder: (_, child) {
-                return AppEnvManager(
-                  child: _buildPlatformApp(
-                    _buildApp(child!),
+              builder: (context, child) {
+                final brightness = Theme.of(context).brightness;
+                final colorScheme = Theme.of(context).colorScheme;
+                return CupertinoTheme(
+                  data: CupertinoThemeData(
+                    brightness: brightness,
+                    primaryColor: colorScheme.primary,
+                    scaffoldBackgroundColor: CupertinoDynamicColor.resolve(
+                      CupertinoColors.systemGroupedBackground,
+                      context,
+                    ),
+                    barBackgroundColor: brightness == Brightness.dark
+                        ? const Color(0xF01C1C1E)
+                        : const Color(0xF0F8F8F8),
+                    textTheme: CupertinoTextThemeData(
+                      primaryColor: colorScheme.primary,
+                    ),
+                  ),
+                  child: AppEnvManager(
+                    child: _buildPlatformApp(
+                      _buildApp(child!),
+                    ),
                   ),
                 );
               },
@@ -247,18 +319,14 @@ class ApplicationState extends ConsumerState<Application> {
               locale: utils.getLocaleForString(locale),
               supportedLocales: AppLocalizations.delegate.supportedLocales,
               themeMode: themeProps.themeMode,
-              theme: ThemeData(
-                useMaterial3: true,
-                pageTransitionsTheme: _pageTransitionsTheme,
-                colorScheme: _getAppColorScheme(
+              theme: _buildTheme(
+                _getAppColorScheme(
                   brightness: Brightness.light,
                   primaryColor: themeProps.primaryColor,
                 ),
               ),
-              darkTheme: ThemeData(
-                useMaterial3: true,
-                pageTransitionsTheme: _pageTransitionsTheme,
-                colorScheme: _getAppColorScheme(
+              darkTheme: _buildTheme(
+                _getAppColorScheme(
                   brightness: Brightness.dark,
                   primaryColor: themeProps.primaryColor,
                 ).toPureBlack(themeProps.pureBlack),

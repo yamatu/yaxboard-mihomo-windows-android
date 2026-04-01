@@ -4,6 +4,7 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/fade_box.dart';
 import 'package:fl_clash/widgets/pop_scope.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -134,25 +135,7 @@ class CommonScaffoldState extends State<CommonScaffold> {
   }
 
   Widget _buildSearchingAppBarTheme(Widget child) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme colorScheme = theme.colorScheme;
-    return Theme(
-      data: theme.copyWith(
-        appBarTheme: theme.appBarTheme.copyWith(
-          backgroundColor: colorScheme.brightness == Brightness.dark
-              ? Colors.grey[900]
-              : Colors.white,
-          iconTheme: theme.primaryIconTheme.copyWith(color: Colors.grey),
-          titleTextStyle: theme.textTheme.titleLarge,
-          toolbarTextStyle: theme.textTheme.bodyMedium,
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          hintStyle: theme.inputDecorationTheme.hintStyle,
-          border: InputBorder.none,
-        ),
-      ),
-      child: child,
-    );
+    return child;
   }
 
   Future<T?> loadingRun<T>(
@@ -246,17 +229,36 @@ class CommonScaffoldState extends State<CommonScaffold> {
 
   Widget? _buildLeading() {
     if (_isEdit) {
-      return IconButton(
+      return CupertinoButton(
+        padding: EdgeInsets.zero,
         onPressed: _appBarState.value.editState?.onExit,
-        icon: Icon(Icons.close),
+        child: Icon(CupertinoIcons.xmark),
       );
     }
     return _isSearch
-        ? IconButton(
+        ? CupertinoButton(
+            padding: EdgeInsets.zero,
             onPressed: _handleExitSearching,
-            icon: Icon(Icons.arrow_back),
+            child: Icon(CupertinoIcons.back),
           )
-        : _appBarState.value.leading ?? widget.leading;
+        : _appBarState.value.leading ?? widget.leading ?? _buildAutoLeading();
+  }
+
+  Widget? _buildAutoLeading() {
+    if (!widget.automaticallyImplyLeading) {
+      return null;
+    }
+    final navigator = Navigator.maybeOf(context);
+    if (navigator == null || !navigator.canPop()) {
+      return null;
+    }
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      onPressed: () {
+        navigator.maybePop();
+      },
+      child: const Icon(CupertinoIcons.back),
+    );
   }
 
   Widget _buildTitle(AppBarSearchState? startState) {
@@ -264,20 +266,17 @@ class CommonScaffoldState extends State<CommonScaffold> {
     if (_appBarState.value.leading != null && !_isSearch && !_isEdit) {
       return const SizedBox.shrink();
     }
-    
+
     return _isSearch
-        ? TextField(
+        ? CupertinoSearchTextField(
             autofocus: true,
             controller: _textController,
-            style: context.textTheme.titleLarge,
             onChanged: (value) {
               if (startState != null) {
                 startState.onSearch(value);
               }
             },
-            decoration: InputDecoration(
-              hintText: appLocalizations.search,
-            ),
+            placeholder: appLocalizations.search,
           )
         : Text(
             !_isEdit
@@ -294,16 +293,18 @@ class CommonScaffoldState extends State<CommonScaffold> {
   ) {
     if (_isSearch) {
       return genActions([
-        IconButton(
+        CupertinoButton(
+          padding: EdgeInsets.zero,
           onPressed: _handleClear,
-          icon: Icon(Icons.close),
+          child: Icon(CupertinoIcons.xmark),
         ),
       ]);
     }
     return genActions(
       [
         if (hasSearch)
-          IconButton(
+          CupertinoButton(
+            padding: EdgeInsets.zero,
             onPressed: () {
               updateSearchState(
                 (state) => state?.copyWith(
@@ -311,7 +312,7 @@ class CommonScaffoldState extends State<CommonScaffold> {
                 ),
               );
             },
-            icon: Icon(Icons.search),
+            child: Icon(CupertinoIcons.search),
           ),
         ...actions
       ],
@@ -341,61 +342,63 @@ class CommonScaffoldState extends State<CommonScaffold> {
   PreferredSizeWidget _buildAppBar() {
     return PreferredSize(
       preferredSize: const Size.fromHeight(kToolbarHeight),
-      child: Theme(
-        data: Theme.of(context).copyWith(
-          appBarTheme: AppBarTheme(
-            systemOverlayStyle: SystemUiOverlayStyle(
-              statusBarColor: Colors.transparent,
-              statusBarIconBrightness:
-                  Theme.of(context).brightness == Brightness.dark
-                      ? Brightness.light
-                      : Brightness.dark,
-              systemNavigationBarIconBrightness:
-                  Theme.of(context).brightness == Brightness.dark
-                      ? Brightness.light
-                      : Brightness.dark,
-              systemNavigationBarColor: widget.bottomNavigationBar != null
-                  ? context.colorScheme.surfaceContainer
-                  : context.colorScheme.surface,
-              systemNavigationBarDividerColor: Colors.transparent,
-            ),
-          ),
-        ),
-        child: Stack(
-          alignment: Alignment.bottomCenter,
-          children: [
-            widget.appBar ??
-                ValueListenableBuilder<AppBarState>(
-                  valueListenable: _appBarState,
-                  builder: (_, state, __) {
-                    return _buildAppBarWrap(
-                      AppBar(
-                        centerTitle: widget.centerTitle ?? false,
-                        automaticallyImplyLeading:
-                            widget.automaticallyImplyLeading,
-                        leading: _buildLeading(),
-                        leadingWidth: widget.leadingWidth,
-                        title: _buildTitle(state.searchState),
-                        actions: _buildActions(
-                          state.searchState != null,
-                          state.actions.isNotEmpty
-                              ? state.actions
-                              : widget.actions ?? [],
-                        ),
-                      ),
-                    );
-                  },
+      child: ValueListenableBuilder<AppBarState>(
+        valueListenable: _appBarState,
+        builder: (_, state, __) {
+          return _buildAppBarWrap(
+            Container(
+              decoration: BoxDecoration(
+                color: CupertinoTheme.of(context).barBackgroundColor,
+                border: Border(
+                  bottom: BorderSide(
+                    color: CupertinoDynamicColor.resolve(
+                      CupertinoColors.separator,
+                      context,
+                    ),
+                    width: 0.5,
+                  ),
                 ),
-            ValueListenableBuilder(
-              valueListenable: _loading,
-              builder: (_, value, __) {
-                return value == true
-                    ? const LinearProgressIndicator()
-                    : Container();
-              },
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: SizedBox(
+                  height: kToolbarHeight,
+                  child: Stack(
+                    alignment: Alignment.bottomCenter,
+                    children: [
+                      NavigationToolbar(
+                        leading: _buildLeading(),
+                        middle: _buildTitle(state.searchState),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: _buildActions(
+                            state.searchState != null,
+                            state.actions.isNotEmpty
+                                ? state.actions
+                                : widget.actions ?? [],
+                          ),
+                        ),
+                        centerMiddle: widget.centerTitle ?? true,
+                        middleSpacing: 8,
+                      ),
+                      ValueListenableBuilder(
+                        valueListenable: _loading,
+                        builder: (_, value, __) {
+                          return value == true
+                              ? const SizedBox(
+                                  height: 2,
+                                  child: LinearProgressIndicator(),
+                                )
+                              : const SizedBox.shrink();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

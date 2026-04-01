@@ -1,70 +1,254 @@
+import 'dart:io';
+
+import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
-import '../core/config_settings.dart';
+
+import '../../../common/path.dart';
 import '../../core/core.dart';
 import '../../infrastructure/network/direct_domain_matcher.dart';
+import '../core/config_settings.dart';
 
-// 初始化文件级日志器
 final _logger = FileLogger('config_file_loader.dart');
+
 List<String> _cachedForceDirectDomains = const [];
 const String _defaultDohResolverUrl = 'https://dns.alidns.com/resolve';
 String _cachedDohResolverUrl = _defaultDohResolverUrl;
 bool _cachedEnableDohResolver = true;
 
-/// 配置文件加载器
-///
-/// 从 assets/config/xboard.config.yaml 加载 XBoard 配置
 class ConfigFileLoader {
-  /// 配置文件路径
   static const String configPath = 'assets/config/xboard.config.yaml';
+  static const String externalConfigFileName = 'xboard.config.yaml';
+  static const String externalCacheFileName = 'xboard.remote.cached.yaml';
+  static const String bootstrapRemoteEnvKey = 'XBOARD_BOOTSTRAP_URL';
 
-  /// 加载配置文件
-  ///
-  /// 从 assets/config/xboard.config.yaml 加载配置
   static Future<ConfigSettings> loadFromFile() async {
     try {
-      final yamlString = await rootBundle.loadString(configPath);
+      final yamlString = await _loadBestYamlString();
       final config = _parseYamlString(yamlString);
-      _logger.info('从 assets 加载配置: $configPath');
+      _logger.info(
+        'Loaded bootstrap config, provider: ${config.currentProvider}',
+      );
       return config;
-    } catch (e) {
-      _logger.error('加载配置文件失败', e);
+    } catch (e, stackTrace) {
+      _logger.error('Failed to load bootstrap config', e, stackTrace);
       return const ConfigSettings();
     }
   }
 
-  /// 解析 YAML 配置字符串
-  static ConfigSettings _parseYamlString(String yamlString) {
+  static Future<Map<String, dynamic>> loadExtendedConfig() async {
     try {
-      // 解析 YAML
+      final yamlString = await _loadBestYamlString();
       final yamlDoc = loadYaml(yamlString);
-      final configMap = _yamlToMap(yamlDoc);
-
-      // 获取 xboard 配置节点
-      final xboardConfig = configMap['xboard'] as Map<String, dynamic>? ?? {};
-
-      // 提取配置参数
-      final provider = xboardConfig['provider'] as String? ?? 'Flclash';
-      final remoteConfigJson =
-          xboardConfig['remote_config'] as Map<String, dynamic>? ?? {};
-      final subscriptionJson =
-          xboardConfig['subscription'] as Map<String, dynamic>? ?? {};
-      final logJson = xboardConfig['log'] as Map<String, dynamic>? ?? {};
-
-      // 构建配置对象
-      return ConfigSettings(
-        currentProvider: provider,
-        remoteConfig: _parseRemoteConfig(remoteConfigJson),
-        subscription: _parseSubscriptionSettings(subscriptionJson),
-        log: _parseLogSettings(logJson),
-      );
-    } catch (e) {
-      _logger.error('解析 YAML 配置失败', e);
-      rethrow;
+      final configMap = _yamlToMap(yamlDoc) as Map<String, dynamic>;
+      return configMap['xboard'] as Map<String, dynamic>? ?? {};
+    } catch (e, stackTrace) {
+      _logger.error('Failed to load extended bootstrap config', e, stackTrace);
+      return {};
     }
   }
 
-  /// 将 YAML 转换为 Map（或其他类型）
+  static Future<String> _loadBestYamlString() async {
+    final assetYaml = await _loadAssetYaml();
+
+    final remoteYaml = await _loadBootstrapRemoteYaml(assetYaml);
+    if (remoteYaml != null) {
+      return remoteYaml;
+    }
+
+    final externalYaml = await _loadExternalYaml();
+    if (externalYaml != null) {
+      _logger.info('Loaded bootstrap config from external file');
+      return externalYaml;
+    }
+
+    _logger.info('Loaded bootstrap config from bundled asset');
+    return assetYaml;
+  }
+
+  static Future<String> _loadAssetYaml() async {
+    return await rootBundle.loadString(configPath);
+  }
+
+  static Future<String?> _loadExternalYaml() async {
+    try {
+      final file = File(await getExternalConfigFilePath());
+      if (!await file.exists()) {
+        return null;
+      }
+      final content = await file.readAsString();
+      return content.trim().isEmpty ? null : content;
+    } catch (e, stackTrace) {
+      _logger.warning(
+          'Failed to read external bootstrap config', e, stackTrace);
+      return null;
+    }
+  }
+
+  static Future<String?> _loadBootstrapRemoteYaml(String assetYaml) async {
+    try {
+      final assetConfig = _parseYamlString(assetYaml);
+      final remoteUrl = _resolveBootstrapRemoteUrl(assetConfig);
+      if (remoteUrl == null || remoteUrl.isEmpty) {
+        return await _loadCachedRemoteYaml();
+      }
+
+      final bootstrapConfig = assetConfig.bootstrapConfig;
+      final yaml = await _downloadYaml(
+        remoteUrl,
+        headers: bootstrapConfig.headers,
+        timeout: bootstrapConfig.timeout,
+      );
+
+      if (yaml == null || yaml.trim().isEmpty) {
+        return await _loadCachedRemoteYaml();
+      }
+
+      if (bootstrapConfig.cacheRemoteToDisk) {
+        await _writeRemoteCache(yaml);
+      }
+      _logger.info('Loaded bootstrap config from remote URL: $remoteUrl');
+      return yaml;
+    } catch (e, stackTrace) {
+      _logger.warning('Failed to load remote bootstrap config', e, stackTrace);
+      return await _loadCachedRemoteYaml();
+    }
+  }
+
+  static String? _resolveBootstrapRemoteUrl(ConfigSettings assetConfig) {
+    final envUrl = const String.fromEnvironment(bootstrapRemoteEnvKey);
+    if (envUrl.trim().isNotEmpty) {
+      return envUrl.trim();
+    }
+
+    final bootstrapUrl = assetConfig.bootstrapConfig.remoteUrl;
+    if (bootstrapUrl != null && bootstrapUrl.trim().isNotEmpty) {
+      return bootstrapUrl.trim();
+    }
+
+    return null;
+  }
+
+  static Future<String?> _loadCachedRemoteYaml() async {
+    try {
+      final file = File(await getRemoteCacheFilePath());
+      if (!await file.exists()) {
+        return null;
+      }
+      final content = await file.readAsString();
+      if (content.trim().isEmpty) {
+        return null;
+      }
+      _logger.info('Loaded bootstrap config from cached remote file');
+      return content;
+    } catch (e, stackTrace) {
+      _logger.warning(
+          'Failed to read cached remote bootstrap config', e, stackTrace);
+      return null;
+    }
+  }
+
+  static Future<void> _writeRemoteCache(String yaml) async {
+    try {
+      final file = File(await getRemoteCacheFilePath());
+      await file.parent.create(recursive: true);
+      await file.writeAsString(yaml, flush: true);
+    } catch (e, stackTrace) {
+      _logger.warning('Failed to cache remote bootstrap config', e, stackTrace);
+    }
+  }
+
+  static Future<String?> _downloadYaml(
+    String url, {
+    required Map<String, String> headers,
+    required Duration timeout,
+  }) async {
+    final dio = Dio(
+      BaseOptions(
+        connectTimeout: timeout,
+        sendTimeout: timeout,
+        receiveTimeout: timeout,
+        responseType: ResponseType.plain,
+        headers: headers,
+      ),
+    );
+
+    final adapter = dio.httpClientAdapter;
+    if (adapter is IOHttpClientAdapter) {
+      adapter.createHttpClient = () {
+        final client = HttpClient();
+        if (kDebugMode) {
+          client.badCertificateCallback = (_, __, ___) => true;
+        }
+        return client;
+      };
+    }
+
+    try {
+      final response = await dio.get<String>(url);
+      if (response.statusCode != 200) {
+        _logger.warning(
+          'Bootstrap remote config request failed: ${response.statusCode}',
+        );
+        return null;
+      }
+      return response.data;
+    } catch (e, stackTrace) {
+      _logger.warning('Bootstrap remote config download failed', e, stackTrace);
+      return null;
+    } finally {
+      dio.close(force: true);
+    }
+  }
+
+  static ConfigSettings _parseYamlString(String yamlString) {
+    final yamlDoc = loadYaml(yamlString);
+    final configMap = _yamlToMap(yamlDoc) as Map<String, dynamic>;
+    final xboardConfig = configMap['xboard'] as Map<String, dynamic>? ?? {};
+
+    final provider = xboardConfig['provider'] as String? ?? 'Flclash';
+    final bootstrapConfigJson =
+        xboardConfig['bootstrap'] as Map<String, dynamic>? ?? {};
+    final remoteConfigJson =
+        xboardConfig['remote_config'] as Map<String, dynamic>? ?? {};
+    final subscriptionJson =
+        xboardConfig['subscription'] as Map<String, dynamic>? ?? {};
+    final logJson = xboardConfig['log'] as Map<String, dynamic>? ?? {};
+
+    return ConfigSettings(
+      currentProvider: provider,
+      bootstrapConfig: _parseBootstrapConfig(bootstrapConfigJson),
+      remoteConfig: _parseRemoteConfig(remoteConfigJson),
+      subscription: _parseSubscriptionSettings(subscriptionJson),
+      log: _parseLogSettings(logJson),
+    );
+  }
+
+  static BootstrapConfigSettings _parseBootstrapConfig(
+    Map<String, dynamic> json,
+  ) {
+    final remoteUrl =
+        json['remote_url'] as String? ?? json['remoteUrl'] as String?;
+    final headers = (json['headers'] as Map<String, dynamic>?)
+            ?.map((key, value) => MapEntry(key, value.toString())) ??
+        const <String, String>{};
+    final timeoutSeconds =
+        json['timeout_seconds'] as int? ?? json['timeoutSeconds'] as int? ?? 15;
+    final cacheRemoteToDisk = json['cache_remote_to_disk'] as bool? ??
+        json['cacheRemoteToDisk'] as bool? ??
+        true;
+
+    return BootstrapConfigSettings(
+      remoteUrl: remoteUrl,
+      headers: headers,
+      timeout: Duration(seconds: timeoutSeconds),
+      cacheRemoteToDisk: cacheRemoteToDisk,
+    );
+  }
+
   static dynamic _yamlToMap(dynamic yaml) {
     if (yaml is YamlMap) {
       final map = <String, dynamic>{};
@@ -72,26 +256,19 @@ class ConfigFileLoader {
         map[key.toString()] = _yamlToMap(value);
       });
       return map;
-    } else if (yaml is YamlList) {
-      return yaml.map((item) => _yamlToMap(item)).toList();
-    } else {
-      return yaml;
     }
+    if (yaml is YamlList) {
+      return yaml.map((item) => _yamlToMap(item)).toList();
+    }
+    return yaml;
   }
 
-  /// 解析远程配置
   static RemoteConfigSettings _parseRemoteConfig(Map<String, dynamic> json) {
     final sourcesList = json['sources'] as List<dynamic>? ?? [];
-    _logger.info('[ConfigLoader] 解析远程配置源: ${sourcesList.length} 个源');
-
     final sources = sourcesList
-        .map((item) => _parseRemoteSource(item as Map<String, dynamic>))
+        .whereType<Map<String, dynamic>>()
+        .map(_parseRemoteSource)
         .toList();
-
-    _logger.info('[ConfigLoader] 成功解析 ${sources.length} 个配置源');
-    for (final source in sources) {
-      _logger.info('[ConfigLoader] - ${source.name}: ${source.url}');
-    }
 
     return RemoteConfigSettings(
       sources: sources,
@@ -101,29 +278,29 @@ class ConfigFileLoader {
     );
   }
 
-  /// 解析远程源配置
   static RemoteSourceConfig _parseRemoteSource(Map<String, dynamic> json) {
+    final headers = (json['headers'] as Map<String, dynamic>?)
+        ?.map((key, value) => MapEntry(key, value.toString()));
     return RemoteSourceConfig(
       name: json['name'] as String? ?? '',
       url: json['url'] as String? ?? '',
-      headers:
-          (json['headers'] as Map<String, dynamic>?)?.cast<String, String>(),
+      headers: headers,
       timeout: json['timeout_seconds'] != null
           ? Duration(seconds: json['timeout_seconds'] as int)
           : null,
-      encryptionKey: json['encryption_key'] as String?,
+      encryptionKey:
+          json['encryption_key'] as String? ?? json['encryptionKey'] as String?,
     );
   }
 
-  /// 解析订阅设置
   static SubscriptionSettings _parseSubscriptionSettings(
-      Map<String, dynamic> json) {
+    Map<String, dynamic> json,
+  ) {
     return SubscriptionSettings(
       preferEncrypt: json['prefer_encrypt'] as bool? ?? false,
     );
   }
 
-  /// 解析日志设置
   static LogSettings _parseLogSettings(Map<String, dynamic> json) {
     return LogSettings(
       enabled: json['enabled'] as bool? ?? true,
@@ -132,26 +309,18 @@ class ConfigFileLoader {
     );
   }
 
-  /// 获取配置文件的其他配置项
-  ///
-  /// 从 assets/config/xboard.config.yaml 加载扩展配置
-  static Future<Map<String, dynamic>> loadExtendedConfig() async {
-    try {
-      final yamlString = await rootBundle.loadString(configPath);
-      final yamlDoc = loadYaml(yamlString);
-      final configMap = _yamlToMap(yamlDoc);
+  static Future<String> getExternalConfigFilePath() async {
+    final homeDir = await appPath.homeDirPath;
+    return p.join(homeDir, externalConfigFileName);
+  }
 
-      return configMap['xboard'] as Map<String, dynamic>? ?? {};
-    } catch (e) {
-      _logger.error('加载扩展配置失败', e);
-      return {};
-    }
+  static Future<String> getRemoteCacheFilePath() async {
+    final homeDir = await appPath.homeDirPath;
+    return p.join(homeDir, externalCacheFileName);
   }
 }
 
-/// 配置辅助函数
 extension ConfigFileLoaderHelper on ConfigFileLoader {
-  /// 获取订阅设置
   static Future<SubscriptionSettings> getSubscriptionSettings() async {
     try {
       final config = await ConfigFileLoader.loadExtendedConfig();
@@ -160,163 +329,136 @@ extension ConfigFileLoaderHelper on ConfigFileLoader {
       return SubscriptionSettings(
         preferEncrypt: subscriptionJson['prefer_encrypt'] as bool? ?? false,
       );
-    } catch (e) {
+    } catch (_) {
       return const SubscriptionSettings();
     }
   }
 
-  /// 获取是否优先使用加密订阅
   static Future<bool> getPreferEncrypt() async {
     try {
       final settings = await getSubscriptionSettings();
       return settings.preferEncrypt;
-    } catch (e) {
+    } catch (_) {
       return true;
     }
   }
 
-  /// 获取是否启用订阅URL竞速（自动跟随加密选项）
   static Future<bool> getEnableRace() async {
     try {
       final settings = await getSubscriptionSettings();
-      return settings.enableRace; // enableRace 是计算属性，等于 preferEncrypt
-    } catch (e) {
+      return settings.enableRace;
+    } catch (_) {
       return true;
     }
   }
 
-  /// 获取延迟测试配置
   static Future<String> getLatencyTestUrl() async {
     try {
       final config = await ConfigFileLoader.loadExtendedConfig();
       final latencyTest = config['latency_test'] as Map<String, dynamic>? ?? {};
       return latencyTest['test_url'] as String? ??
           'http://www.gstatic.com/generate_204';
-    } catch (e) {
+    } catch (_) {
       return 'http://www.gstatic.com/generate_204';
     }
   }
 
-  /// 获取 SDK 配置
   static Future<Map<String, dynamic>> getSdkConfig() async {
     try {
       final config = await ConfigFileLoader.loadExtendedConfig();
       return config['sdk'] as Map<String, dynamic>? ?? {};
-    } catch (e) {
+    } catch (_) {
       return {};
     }
   }
 
-  /// 获取应用配置
   static Future<Map<String, dynamic>> getAppConfig() async {
     try {
       final config = await ConfigFileLoader.loadExtendedConfig();
       return config['app'] as Map<String, dynamic>? ?? {};
-    } catch (e) {
+    } catch (_) {
       return {};
     }
   }
 
-  /// 获取安全配置
   static Future<Map<String, dynamic>> getSecurityConfig() async {
     try {
       final config = await ConfigFileLoader.loadExtendedConfig();
       return config['security'] as Map<String, dynamic>? ?? {};
-    } catch (e) {
+    } catch (_) {
       return {};
     }
   }
 
-  /// 获取网络配置
   static Future<Map<String, dynamic>> getNetworkConfig() async {
     try {
       final config = await ConfigFileLoader.loadExtendedConfig();
       return config['network'] as Map<String, dynamic>? ?? {};
-    } catch (e) {
+    } catch (_) {
       return {};
     }
   }
 
-  /// 获取解密密钥
   static Future<String> getDecryptKey() async {
     try {
       final config = await ConfigFileLoader.loadExtendedConfig();
       final subscription =
           config['subscription'] as Map<String, dynamic>? ?? {};
       return subscription['decrypt_key'] as String? ?? '';
-    } catch (e) {
+    } catch (_) {
       return '';
     }
   }
 
-  /// 获取 User-Agent 配置
   static Future<Map<String, String>> getUserAgents() async {
     try {
       final security = await getSecurityConfig();
       final userAgents = security['user_agents'] as Map<String, dynamic>? ?? {};
-      return userAgents.cast<String, String>();
-    } catch (e) {
+      return userAgents.map((key, value) => MapEntry(key, value.toString()));
+    } catch (_) {
       return {};
     }
   }
 
-  /// 获取证书配置
   static Future<Map<String, dynamic>> getCertificateConfig() async {
-    // 硬编码证书配置，不再从配置文件读取
     return {
       'path': 'assets/cer/client-cert.crt',
       'enabled': false,
     };
   }
 
-  /// 获取应用标题
   static Future<String> getAppTitle() async {
     try {
       final app = await getAppConfig();
       return app['title'] as String? ?? 'XBoard';
-    } catch (e) {
+    } catch (_) {
       return 'XBoard';
     }
   }
 
-  /// 获取应用网站地址
   static Future<String> getAppWebsite() async {
     try {
       final app = await getAppConfig();
       return app['website'] as String? ?? 'example.com';
-    } catch (e) {
+    } catch (_) {
       return 'example.com';
     }
   }
 
-  /// 获取混淆前缀字符串
-  ///
-  /// 返回配置文件中的混淆前缀，如果未配置或配置为 null 则返回 null
-  /// 用于 Caddy 反代等场景的响应反混淆
-  /// SDK 会自动检测响应是否包含此前缀，有则反混淆，无则直接解析
   static Future<String?> getObfuscationPrefix() async {
     try {
       final security = await getSecurityConfig();
       final prefix = security['obfuscation_prefix'];
-
-      // 如果配置为空字符串或 null，返回 null
       if (prefix == null || (prefix is String && prefix.isEmpty)) {
         return null;
       }
-
       return prefix as String;
-    } catch (e) {
-      _logger.warning('获取混淆前缀失败: $e');
+    } catch (e, stackTrace) {
+      _logger.warning('Failed to get obfuscation prefix', e, stackTrace);
       return null;
     }
   }
 
-  /// 获取强制直连域名列表
-  ///
-  /// 从 xboard.config.yaml 的 `network.force_direct_domains` 读取。
-  /// 支持格式：
-  /// - 列表：['yamatu.xyz', 'panel.example.com']
-  /// - 字符串：'yamatu.xyz,panel.example.com'
   static Future<List<String>> getForceDirectDomains() async {
     try {
       final config = await ConfigFileLoader.loadExtendedConfig();
@@ -352,8 +494,8 @@ extension ConfigFileLoaderHelper on ConfigFileLoader {
 
       _cachedForceDirectDomains = const [];
       return const [];
-    } catch (e) {
-      _logger.warning('获取强制直连域名失败: $e');
+    } catch (e, stackTrace) {
+      _logger.warning('Failed to get force direct domains', e, stackTrace);
       _cachedForceDirectDomains = const [];
       return const [];
     }
@@ -363,9 +505,6 @@ extension ConfigFileLoaderHelper on ConfigFileLoader {
     return List<String>.from(_cachedForceDirectDomains);
   }
 
-  /// 获取 DoH 解析服务器地址。
-  ///
-  /// 配置路径：`xboard.network.doh_url`
   static Future<String> getDohResolverUrl() async {
     try {
       final network = await getNetworkConfig();
@@ -382,8 +521,8 @@ extension ConfigFileLoaderHelper on ConfigFileLoader {
 
       _cachedDohResolverUrl = _defaultDohResolverUrl;
       return _defaultDohResolverUrl;
-    } catch (e) {
-      _logger.warning('获取 DoH 解析地址失败: $e');
+    } catch (e, stackTrace) {
+      _logger.warning('Failed to get DoH resolver URL', e, stackTrace);
       _cachedDohResolverUrl = _defaultDohResolverUrl;
       return _defaultDohResolverUrl;
     }
@@ -393,9 +532,6 @@ extension ConfigFileLoaderHelper on ConfigFileLoader {
     return _cachedDohResolverUrl;
   }
 
-  /// 是否启用应用内 DoH 解析。
-  ///
-  /// 配置路径：`xboard.network.enable_doh_resolver`
   static Future<bool> getEnableDohResolver() async {
     try {
       final network = await getNetworkConfig();
@@ -420,8 +556,8 @@ extension ConfigFileLoaderHelper on ConfigFileLoader {
 
       _cachedEnableDohResolver = true;
       return true;
-    } catch (e) {
-      _logger.warning('获取 DoH 启用状态失败: $e');
+    } catch (e, stackTrace) {
+      _logger.warning('Failed to get DoH resolver enabled flag', e, stackTrace);
       _cachedEnableDohResolver = true;
       return true;
     }
@@ -429,5 +565,14 @@ extension ConfigFileLoaderHelper on ConfigFileLoader {
 
   static bool getCachedEnableDohResolver() {
     return _cachedEnableDohResolver;
+  }
+
+  static Future<String?> getBootstrapRemoteUrl() async {
+    try {
+      final config = await ConfigFileLoader.loadFromFile();
+      return config.bootstrapConfig.remoteUrl;
+    } catch (_) {
+      return null;
+    }
   }
 }

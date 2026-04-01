@@ -11,6 +11,7 @@ import 'package:fl_clash/widgets/fade_box.dart';
 import 'package:fl_clash/widgets/input.dart';
 import 'package:fl_clash/widgets/list.dart';
 import 'package:fl_clash/widgets/text.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -169,7 +170,7 @@ class BackupAndRecovery extends ConsumerWidget {
         ListHeader(title: appLocalizations.remote),
         if (dav == null)
           ListItem(
-            leading: const Icon(Icons.account_box),
+            leading: const Icon(CupertinoIcons.person_crop_square),
             title: Text(appLocalizations.noInfo),
             subtitle: Text(appLocalizations.pleaseBindWebDAV),
             trailing: FilledButton.tonal(
@@ -183,7 +184,7 @@ class BackupAndRecovery extends ConsumerWidget {
           )
         else ...[
           ListItem(
-            leading: const Icon(Icons.account_box),
+            leading: const Icon(CupertinoIcons.person_crop_square),
             title: TooltipText(
               text: Text(
                 dav.user,
@@ -207,8 +208,8 @@ class BackupAndRecovery extends ConsumerWidget {
                                   ? const SizedBox(
                                       width: 12,
                                       height: 12,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 1,
+                                      child: CupertinoActivityIndicator(
+                                        radius: 6,
                                       ),
                                     )
                                   : Container(
@@ -418,7 +419,7 @@ class _WebDAVFormDialogState extends ConsumerState<WebDAVFormDialog> {
               maxLines: 5,
               minLines: 1,
               decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.link),
+                prefixIcon: const Icon(CupertinoIcons.link),
                 border: const OutlineInputBorder(),
                 labelText: appLocalizations.address,
                 helperText: appLocalizations.addressHelp,
@@ -433,7 +434,7 @@ class _WebDAVFormDialogState extends ConsumerState<WebDAVFormDialog> {
             TextFormField(
               controller: userController,
               decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.account_circle),
+                prefixIcon: const Icon(CupertinoIcons.person_circle),
                 border: const OutlineInputBorder(),
                 labelText: appLocalizations.account,
               ),
@@ -451,11 +452,12 @@ class _WebDAVFormDialogState extends ConsumerState<WebDAVFormDialog> {
                   controller: passwordController,
                   obscureText: obscure,
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.password),
+                    prefixIcon: const Icon(CupertinoIcons.lock),
                     border: const OutlineInputBorder(),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        obscure ? Icons.visibility : Icons.visibility_off,
+                    suffixIcon: CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      child: Icon(
+                        obscure ? CupertinoIcons.eye : CupertinoIcons.eye_slash,
                       ),
                       onPressed: () {
                         _obscureController.value = !obscure;

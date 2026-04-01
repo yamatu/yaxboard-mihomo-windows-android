@@ -2,6 +2,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/state.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'scaffold.dart';
@@ -52,16 +53,13 @@ Future<T?> showSheet<T>({
 }) {
   final isMobile = globalState.appState.viewMode == ViewMode.mobile;
   return switch (isMobile) {
-    true => showModalBottomSheet<T>(
+    true => showCupertinoModalPopup<T>(
         context: context,
-        isScrollControlled: props.isScrollControlled,
         builder: (_) {
           return SafeArea(
             child: builder(context, SheetType.bottomSheet),
           );
         },
-        showDragHandle: false,
-        useSafeArea: props.useSafeArea,
       ),
     false => showModalSideSheet<T>(
         useSafeArea: props.useSafeArea,
@@ -127,22 +125,45 @@ class _AdaptiveSheetScaffoldState extends State<AdaptiveSheetScaffold> {
     final backgroundColor = context.colorScheme.surface;
     final bottomSheet = widget.type == SheetType.bottomSheet;
     final sideSheet = widget.type == SheetType.sideSheet;
-    final appBar = AppBar(
-      forceMaterialTransparency: bottomSheet ? true : false,
-      automaticallyImplyLeading: bottomSheet
-          ? false
-          : widget.actions.isEmpty && sideSheet
-              ? false
-              : true,
-      centerTitle: bottomSheet,
-      backgroundColor: backgroundColor,
-      title: Text(
-        widget.title,
+    final appBar = Container(
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        border: Border(
+          bottom: BorderSide(
+            color: CupertinoDynamicColor.resolve(CupertinoColors.separator, context),
+            width: 0.5,
+          ),
+        ),
       ),
-      actions: genActions([
-        if (widget.actions.isEmpty && sideSheet) CloseButton(),
-        ...widget.actions,
-      ]),
+      height: kToolbarHeight,
+      child: NavigationToolbar(
+        leading: bottomSheet
+            ? null
+            : (widget.actions.isEmpty && sideSheet
+                ? null
+                : CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    child: const Icon(CupertinoIcons.back),
+                    onPressed: () => Navigator.of(context).pop(),
+                  )),
+        middle: Text(
+          widget.title,
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: genActions([
+            if (widget.actions.isEmpty && sideSheet)
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                child: const Icon(CupertinoIcons.xmark),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ...widget.actions,
+          ]),
+        ),
+        centerMiddle: bottomSheet,
+      ),
     );
     if (bottomSheet) {
       final handleSize = Size(32, 4);
@@ -150,7 +171,7 @@ class _AdaptiveSheetScaffoldState extends State<AdaptiveSheetScaffold> {
         clipBehavior: Clip.hardEdge,
         decoration: ShapeDecoration(
           color: backgroundColor,
-          shape: RoundedSuperellipseBorder(
+          shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(28.0)),
           ),
         ),
@@ -164,10 +185,10 @@ class _AdaptiveSheetScaffoldState extends State<AdaptiveSheetScaffold> {
                 height: handleSize.height,
                 width: handleSize.width,
                 decoration: ShapeDecoration(
-                  shape: RoundedSuperellipseBorder(
+                  shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(handleSize.height / 2),
                   ),
-                  color: context.colorScheme.onSurfaceVariant,
+                  color: CupertinoDynamicColor.resolve(CupertinoColors.systemGrey3, context),
                 ),
               ),
             ),
@@ -180,9 +201,12 @@ class _AdaptiveSheetScaffoldState extends State<AdaptiveSheetScaffold> {
         ),
       );
     }
-    return CommonScaffold(
-      appBar: appBar,
+    return Scaffold(
       backgroundColor: backgroundColor,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(kToolbarHeight),
+        child: appBar,
+      ),
       body: widget.body,
     );
   }

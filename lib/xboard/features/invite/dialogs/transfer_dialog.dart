@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:fl_clash/xboard/utils/xboard_notification.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_clash/common/common.dart';
@@ -27,32 +27,33 @@ class _TransferDialogState extends ConsumerState<TransferDialog> {
     final inviteState = ref.read(inviteProvider);
     final double maxAmount = inviteState.availableCommission;  // 已经是元，不需要再除以100
 
-    return AlertDialog(
+    return CupertinoAlertDialog(
       title: Text(appLocalizations.transferToWallet),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          const SizedBox(height: 8),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
             child: _isSuccess
                 ? const Icon(
-                    Icons.check_circle,
+                    CupertinoIcons.checkmark_circle_fill,
                     size: 48,
-                    color: Colors.green,
+                    color: CupertinoColors.activeGreen,
                     key: ValueKey('success'),
                   )
                 : _isTransferring
                     ? const SizedBox(
                         width: 48,
                         height: 48,
-                        child: CircularProgressIndicator(
+                        child: CupertinoActivityIndicator(
                           key: ValueKey('loading'),
                         ),
                       )
                     : const Icon(
-                        Icons.account_balance_wallet,
+                        CupertinoIcons.money_dollar_circle,
                         size: 48,
-                        color: Colors.blue,
+                        color: CupertinoColors.activeBlue,
                         key: ValueKey('wallet'),
                       ),
           ),
@@ -65,7 +66,7 @@ class _TransferDialogState extends ConsumerState<TransferDialog> {
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.green,
+                      color: CupertinoColors.activeGreen,
                     ),
                     key: const ValueKey('success-text'),
                   )
@@ -89,23 +90,29 @@ class _TransferDialogState extends ConsumerState<TransferDialog> {
           ),
           const SizedBox(height: 16),
           if (!_isTransferring && !_isSuccess) ...[
-            TextField(
+            CupertinoTextField(
               controller: _amountController,
-              decoration: InputDecoration(
-                labelText: appLocalizations.transferAmount,
-                hintText: appLocalizations.enterTransferAmount,
-                border: const OutlineInputBorder(),
-                suffixText: '¥',
-                helperText: appLocalizations.maxTransferable(maxAmount.toStringAsFixed(2)),
+              placeholder: appLocalizations.enterTransferAmount,
+              suffix: const Padding(
+                padding: EdgeInsets.only(right: 8),
+                child: Text('¥'),
               ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              appLocalizations.maxTransferable(maxAmount.toStringAsFixed(2)),
+              style: TextStyle(
+                fontSize: 12,
+                color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
+              ),
             ),
             const SizedBox(height: 12),
             Text(
               appLocalizations.transferNote,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey,
+                color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
               ),
               textAlign: TextAlign.center,
             ),
@@ -114,11 +121,12 @@ class _TransferDialogState extends ConsumerState<TransferDialog> {
       ),
       actions: [
         if (!_isTransferring && !_isSuccess) ...[
-          TextButton(
+          CupertinoDialogAction(
             onPressed: () => Navigator.of(context).pop(),
             child: Text(appLocalizations.cancel),
           ),
-          ElevatedButton(
+          CupertinoDialogAction(
+            isDefaultAction: true,
             onPressed: () => _performTransfer(maxAmount),
             child: Text(appLocalizations.confirmTransfer),
           ),
@@ -135,7 +143,7 @@ class _TransferDialogState extends ConsumerState<TransferDialog> {
       }
       return;
     }
-    
+
     final amount = double.tryParse(amountText);
     if (amount == null || amount <= 0) {
       if (mounted) {
@@ -143,27 +151,27 @@ class _TransferDialogState extends ConsumerState<TransferDialog> {
       }
       return;
     }
-    
+
     if (amount > maxAmount) {
       if (mounted) {
         XBoardNotification.showError(appLocalizations.transferAmountExceeded(maxAmount.toStringAsFixed(2)));
       }
       return;
     }
-    
+
     setState(() {
       _isTransferring = true;
     });
-    
+
     try {
       final result = await ref.read(inviteProvider.notifier).transferCommission(amount);
-      
+
       if (mounted) {
         setState(() {
           _isTransferring = false;
           _isSuccess = result;
         });
-        
+
         if (result) {
           // 成功后显示动画，然后自动关闭
           await Future.delayed(const Duration(milliseconds: 1500));

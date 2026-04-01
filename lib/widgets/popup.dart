@@ -1,5 +1,8 @@
+import 'dart:ui';
+
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/models/common.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class CommonPopupRoute<T> extends PopupRoute<T> {
@@ -226,7 +229,8 @@ class CommonPopupMenu extends StatelessWidget {
     final color = disabled
         ? context.colorScheme.onSurface.opacity30
         : context.colorScheme.onSurface;
-    return InkWell(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onPressed != null
           ? () {
               Navigator.of(context).pop();
@@ -273,31 +277,44 @@ class CommonPopupMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bgColor = CupertinoDynamicColor.resolve(
+      CupertinoColors.secondarySystemGroupedBackground,
+      context,
+    );
     return IntrinsicHeight(
       child: IntrinsicWidth(
-        child: Card(
-          elevation: 12,
-          color: context.colorScheme.surfaceContainer,
-          clipBehavior: Clip.antiAlias,
-          shape: RoundedSuperellipseBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (final item in items.asMap().entries) ...[
-                _popupMenuItem(
-                  context,
-                  item: item.value,
-                  index: item.key,
-                ),
-                if (item.value != items.last)
-                  Divider(
-                    height: 0,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              decoration: BoxDecoration(
+                color: bgColor.withOpacity(0.85),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0x29000000),
+                    blurRadius: 20,
+                    offset: const Offset(0, 4),
                   ),
-              ],
-            ],
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final item in items.asMap().entries) ...[
+                    _popupMenuItem(context, item: item.value, index: item.key),
+                    if (item.value != items.last)
+                      Container(
+                        height: 0.5,
+                        margin: const EdgeInsets.only(left: 16),
+                        color: CupertinoDynamicColor.resolve(CupertinoColors.separator, context),
+                      ),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
       ),

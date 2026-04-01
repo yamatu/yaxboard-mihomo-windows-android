@@ -1,5 +1,5 @@
 import 'package:fl_clash/xboard/domain/domain.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/xboard/features/invite/providers/invite_provider.dart';
@@ -13,19 +13,19 @@ class CommissionHistoryDialog extends ConsumerStatefulWidget {
 
 class _CommissionHistoryDialogState extends ConsumerState<CommissionHistoryDialog> {
   final ScrollController _scrollController = ScrollController();
-  
+
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
   }
-  
+
   @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
   }
-  
+
   void _onScroll() {
     if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
       final inviteState = ref.read(inviteProvider);
@@ -38,16 +38,16 @@ class _CommissionHistoryDialogState extends ConsumerState<CommissionHistoryDialo
   @override
   Widget build(BuildContext context) {
     final inviteState = ref.watch(inviteProvider);
-    
-    return AlertDialog(
+
+    return CupertinoAlertDialog(
       title: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(appLocalizations.commissionHistory),
-          IconButton(
+          CupertinoButton(
+            padding: EdgeInsets.zero,
             onPressed: () => ref.read(inviteProvider.notifier).refreshCommissionHistory(),
-            icon: const Icon(Icons.refresh),
-            tooltip: appLocalizations.refresh,
+            child: const Icon(CupertinoIcons.refresh, size: 22),
           ),
         ],
       ),
@@ -63,25 +63,43 @@ class _CommissionHistoryDialogState extends ConsumerState<CommissionHistoryDialo
                 children: [
                   Text(
                     appLocalizations.totalRecords(inviteState.commissionHistory.length),
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
+                    ),
                   ),
                   Text(
                     appLocalizations.pageNumber(inviteState.currentHistoryPage),
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
+                    ),
                   ),
                 ],
               ),
             ),
-            const Divider(height: 1),
+            Container(
+              height: 1,
+              color: CupertinoDynamicColor.resolve(CupertinoColors.separator, context),
+            ),
             Expanded(
               child: inviteState.commissionHistory.isEmpty
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.history, size: 48, color: Colors.grey),
+                          Icon(
+                            CupertinoIcons.clock,
+                            size: 48,
+                            color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
+                          ),
                           const SizedBox(height: 8),
-                          Text(appLocalizations.noCommissionRecord, style: const TextStyle(color: Colors.grey)),
+                          Text(
+                            appLocalizations.noCommissionRecord,
+                            style: TextStyle(
+                              color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
+                            ),
+                          ),
                         ],
                       ),
                     )
@@ -96,22 +114,33 @@ class _CommissionHistoryDialogState extends ConsumerState<CommissionHistoryDialo
                               child: inviteState.isLoadingHistory
                                   ? Column(
                                       children: [
-                                        const CircularProgressIndicator(),
+                                        const CupertinoActivityIndicator(),
                                         const SizedBox(height: 8),
-                                        Text(appLocalizations.loading, style: const TextStyle(color: Colors.grey)),
+                                        Text(
+                                          appLocalizations.loading,
+                                          style: TextStyle(
+                                            color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
+                                          ),
+                                        ),
                                       ],
                                     )
-                                  : TextButton.icon(
+                                  : CupertinoButton(
                                       onPressed: () => ref.read(inviteProvider.notifier).loadNextHistoryPage(),
-                                      icon: const Icon(Icons.expand_more),
-                                      label: Text(appLocalizations.loadMore),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(CupertinoIcons.chevron_down, size: 16),
+                                          const SizedBox(width: 4),
+                                          Text(appLocalizations.loadMore),
+                                        ],
+                                      ),
                                     ),
                             ),
                           );
                         }
-                        
+
                         final commission = inviteState.commissionHistory[index];
-                        return _buildCommissionItem(commission);
+                        return _buildCommissionItem(context, commission);
                       },
                     ),
             ),
@@ -119,7 +148,7 @@ class _CommissionHistoryDialogState extends ConsumerState<CommissionHistoryDialo
         ),
       ),
       actions: [
-        TextButton(
+        CupertinoDialogAction(
           onPressed: () => Navigator.of(context).pop(),
           child: Text(appLocalizations.close),
         ),
@@ -127,19 +156,21 @@ class _CommissionHistoryDialogState extends ConsumerState<CommissionHistoryDialo
     );
   }
 
-  Widget _buildCommissionItem(DomainCommission commission) {
+  Widget _buildCommissionItem(BuildContext context, DomainCommission commission) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(
+          color: CupertinoDynamicColor.resolve(CupertinoColors.separator, context),
+        ),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.monetization_on,
-            color: Colors.green[600],
+          const Icon(
+            CupertinoIcons.money_dollar_circle_fill,
+            color: CupertinoColors.activeGreen,
             size: 20,
           ),
           const SizedBox(width: 12),
@@ -158,7 +189,7 @@ class _CommissionHistoryDialogState extends ConsumerState<CommissionHistoryDialo
                   appLocalizations.orderNumber(commission.tradeNo),
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey[600],
+                    color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
                   ),
                 ),
               ],
@@ -171,7 +202,7 @@ class _CommissionHistoryDialogState extends ConsumerState<CommissionHistoryDialo
                 '${commission.createdAt.year}-${commission.createdAt.month.toString().padLeft(2, '0')}-${commission.createdAt.day.toString().padLeft(2, '0')}',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
                 ),
               ),
             ],

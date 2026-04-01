@@ -1,6 +1,7 @@
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/widgets/fade_box.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'text.dart';
@@ -29,6 +30,10 @@ class InfoHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final secondaryLabel = CupertinoDynamicColor.resolve(
+      CupertinoColors.secondaryLabel,
+      context,
+    );
     return Padding(
       padding: padding ?? baseInfoEdgeInsets,
       child: Row(
@@ -43,7 +48,7 @@ class InfoHeader extends StatelessWidget {
                 if (info.iconData != null) ...[
                   Icon(
                     info.iconData,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: secondaryLabel,
                   ),
                   const SizedBox(
                     width: 8,
@@ -56,9 +61,11 @@ class InfoHeader extends StatelessWidget {
                       info.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            color: context.colorScheme.onSurfaceVariant,
-                          ),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: secondaryLabel,
+                      ),
                     ),
                   ),
                 ),
@@ -108,42 +115,6 @@ class CommonCard extends StatelessWidget {
   // final WidgetStateProperty<Color?>? backgroundColor;
   // final WidgetStateProperty<BorderSide?>? borderSide;
 
-  BorderSide getBorderSide(BuildContext context, Set<WidgetState> states) {
-    final colorScheme = context.colorScheme;
-    if (type == CommonCardType.filled) {
-      return BorderSide.none;
-    }
-    final hoverColor = isSelected
-        ? colorScheme.primary.opacity80
-        : colorScheme.primary.opacity60;
-    if (states.contains(WidgetState.hovered) ||
-        states.contains(WidgetState.focused) ||
-        states.contains(WidgetState.pressed)) {
-      return BorderSide(
-        color: hoverColor,
-      );
-    }
-    return BorderSide(
-      color: isSelected
-          ? colorScheme.primary
-          : colorScheme.surfaceContainerHighest,
-    );
-  }
-
-  Color? getBackgroundColor(BuildContext context, Set<WidgetState> states) {
-    final colorScheme = context.colorScheme;
-    if (type == CommonCardType.filled) {
-      if (isSelected) {
-        return colorScheme.secondaryContainer.opacity80;
-      }
-      return colorScheme.surfaceContainer;
-    }
-    if (isSelected) {
-      return colorScheme.secondaryContainer;
-    }
-    return colorScheme.surfaceContainerLow;
-  }
-
   @override
   Widget build(BuildContext context) {
     var childWidget = child;
@@ -179,27 +150,41 @@ class CommonCard extends StatelessWidget {
       );
     }
 
-    final card = OutlinedButton(
-      onLongPress: null,
-      clipBehavior: Clip.antiAlias,
-      style: ButtonStyle(
-        padding: const WidgetStatePropertyAll(EdgeInsets.zero),
-        shape: WidgetStatePropertyAll(
-          RoundedSuperellipseBorder(
-            borderRadius: BorderRadius.circular(radius),
-          ),
+    final isDark = CupertinoTheme.brightnessOf(context) == Brightness.dark;
+    final bgColor = type == CommonCardType.filled
+        ? (isSelected
+            ? CupertinoTheme.of(context).primaryColor.withOpacity(0.12)
+            : CupertinoDynamicColor.resolve(CupertinoColors.tertiarySystemGroupedBackground, context))
+        : (isSelected
+            ? CupertinoTheme.of(context).primaryColor.withOpacity(0.10)
+            : CupertinoDynamicColor.resolve(CupertinoColors.secondarySystemGroupedBackground, context));
+
+    final card = GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onPressed,
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(radius),
+          border: type != CommonCardType.filled
+              ? Border.all(
+                  color: isSelected
+                      ? CupertinoTheme.of(context).primaryColor
+                      : CupertinoDynamicColor.resolve(CupertinoColors.separator, context),
+                  width: 0.5,
+                )
+              : null,
+          boxShadow: [
+            BoxShadow(
+              color: isDark ? Colors.transparent : const Color(0x0D000000),
+              blurRadius: 2,
+              offset: const Offset(0, 1),
+            ),
+          ],
         ),
-        iconColor: WidgetStatePropertyAll(context.colorScheme.primary),
-        iconSize: WidgetStateProperty.all(20),
-        backgroundColor: WidgetStateProperty.resolveWith(
-          (states) => getBackgroundColor(context, states),
-        ),
-        side: WidgetStateProperty.resolveWith(
-          (states) => getBorderSide(context, states),
-        ),
+        child: childWidget,
       ),
-      onPressed: onPressed,
-      child: childWidget,
     );
 
     return switch (enterAnimated) {
@@ -216,15 +201,16 @@ class SelectIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Theme.of(context).colorScheme.inversePrimary,
-      shape: const CircleBorder(),
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        child: const Icon(
-          Icons.check,
-          size: 16,
-        ),
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: CupertinoTheme.of(context).primaryColor.withOpacity(0.85),
+        shape: BoxShape.circle,
+      ),
+      child: const Icon(
+        CupertinoIcons.check_mark,
+        size: 16,
+        color: CupertinoColors.white,
       ),
     );
   }
@@ -251,8 +237,14 @@ class SettingsBlock extends StatelessWidget {
               label: title,
             ),
           ),
-          Card(
-            color: context.colorScheme.surfaceContainer,
+          Container(
+            decoration: BoxDecoration(
+              color: CupertinoDynamicColor.resolve(
+                CupertinoColors.secondarySystemGroupedBackground,
+                context,
+              ),
+              borderRadius: BorderRadius.circular(10),
+            ),
             child: Column(
               children: settings,
             ),

@@ -10,6 +10,7 @@ import 'package:fl_clash/widgets/list.dart';
 import 'package:fl_clash/widgets/null_status.dart';
 import 'package:fl_clash/widgets/popup.dart';
 import 'package:fl_clash/widgets/scaffold.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -76,19 +77,20 @@ class _ScriptsViewState extends ConsumerState<ScriptsView> {
                 ),
                 trailing: CommonPopupBox(
                   targetBuilder: (open) {
-                    return IconButton(
+                    return CupertinoButton(
+                      padding: EdgeInsets.zero,
                       onPressed: () {
                         open();
                       },
-                      icon: Icon(
-                        Icons.more_vert,
+                      child: Icon(
+                        CupertinoIcons.ellipsis_vertical,
                       ),
                     );
                   },
                   popup: CommonPopupMenu(
                     items: [
                       PopupMenuItemData(
-                        icon: Icons.edit,
+                        icon: CupertinoIcons.pencil,
                         label: appLocalizations.edit,
                         onPressed: () {
                           _handleToEditor(
@@ -97,7 +99,7 @@ class _ScriptsViewState extends ConsumerState<ScriptsView> {
                         },
                       ),
                       PopupMenuItemData(
-                        icon: Icons.delete,
+                        icon: CupertinoIcons.delete,
                         label: appLocalizations.delete,
                         onPressed: () {
                           _handleDelScript(
@@ -236,11 +238,14 @@ class _ScriptsViewState extends ConsumerState<ScriptsView> {
   @override
   Widget build(BuildContext context) {
     return CommonScaffold(
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: CupertinoButton(
+        padding: const EdgeInsets.all(16),
+        color: Theme.of(context).colorScheme.primary,
+        borderRadius: BorderRadius.circular(28),
         onPressed: () {
           _handleToEditor();
         },
-        child: Icon(Icons.add),
+        child: Icon(CupertinoIcons.add, color: Theme.of(context).colorScheme.onPrimary),
       ),
       body: _buildContent(),
       title: appLocalizations.script,
