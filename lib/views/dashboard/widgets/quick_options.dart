@@ -5,7 +5,6 @@ import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/views/config/network.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class TUNButton extends StatelessWidget {
@@ -60,7 +59,8 @@ class TUNButton extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w300,
-                      color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
+                      color: CupertinoDynamicColor.resolve(
+                          CupertinoColors.secondaryLabel, context),
                     ),
                   ),
                 ),
@@ -107,6 +107,7 @@ class SystemProxyButton extends StatelessWidget {
                   generateSection(
                     items: [
                       SystemProxyItem(),
+                      const AirportProxyItem(),
                       BypassDomainItem(),
                     ],
                   ),
@@ -140,7 +141,8 @@ class SystemProxyButton extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w300,
-                      color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
+                      color: CupertinoDynamicColor.resolve(
+                          CupertinoColors.secondaryLabel, context),
                     ),
                   ),
                 ),
@@ -221,7 +223,8 @@ class VpnButton extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w300,
-                      color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
+                      color: CupertinoDynamicColor.resolve(
+                          CupertinoColors.secondaryLabel, context),
                     ),
                   ),
                 ),
@@ -271,6 +274,7 @@ class IPv6Button extends StatelessWidget {
                   generateSection(
                     items: [
                       const _IPv6ConfigItem(),
+                      const AirportProxyItem(),
                     ],
                   ),
                 ),
@@ -303,7 +307,8 @@ class IPv6Button extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w300,
-                      color: CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
+                      color: CupertinoDynamicColor.resolve(
+                          CupertinoColors.secondaryLabel, context),
                     ),
                   ),
                 ),
@@ -312,13 +317,14 @@ class IPv6Button extends StatelessWidget {
                 builder: (_, ref, __) {
                   final ipv6 = system.isDesktop
                       ? ref.watch(
-                          patchClashConfigProvider.select((state) => state.ipv6),
+                          patchClashConfigProvider
+                              .select((state) => state.ipv6),
                         )
                       : ref.watch(
-                          patchClashConfigProvider.select(
-                            (state) => state.ipv6,
-                          ),
-                        ) &&
+                            patchClashConfigProvider.select(
+                              (state) => state.ipv6,
+                            ),
+                          ) &&
                           ref.watch(
                             vpnSettingProvider.select((state) => state.ipv6),
                           );
@@ -330,6 +336,179 @@ class IPv6Button extends StatelessWidget {
                   );
                 },
               )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class AirportProxyButton extends StatelessWidget {
+  const AirportProxyButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: getWidgetHeight(1),
+      child: CommonCard(
+        onPressed: () {
+          showSheet(
+            context: context,
+            builder: (_, type) {
+              return AdaptiveSheetScaffold(
+                type: type,
+                body: generateListView(
+                  generateSection(
+                    items: const [
+                      AirportProxyItem(),
+                    ],
+                  ),
+                ),
+                title: '机场代理',
+              );
+            },
+          );
+        },
+        info: const Info(
+          label: '机场代理',
+          iconData: CupertinoIcons.cloud,
+        ),
+        child: Container(
+          padding: baseInfoEdgeInsets.copyWith(
+            top: 4,
+            bottom: 8,
+            right: 8,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.max,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                flex: 1,
+                child: TooltipText(
+                  text: Text(
+                    appLocalizations.options,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w300,
+                      color: CupertinoDynamicColor.resolve(
+                        CupertinoColors.secondaryLabel,
+                        context,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Consumer(
+                builder: (_, ref, __) {
+                  final proxyBackendTraffic = ref.watch(
+                    networkSettingProvider.select(
+                      (state) => state.proxyBackendTraffic,
+                    ),
+                  );
+                  return CupertinoSwitch(
+                    value: proxyBackendTraffic,
+                    onChanged: (value) {
+                      ref.read(networkSettingProvider.notifier).updateState(
+                            (state) => state.copyWith(
+                              proxyBackendTraffic: value,
+                            ),
+                          );
+                    },
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ClientEchButton extends StatelessWidget {
+  const ClientEchButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: getWidgetHeight(1),
+      child: CommonCard(
+        onPressed: () {
+          showSheet(
+            context: context,
+            builder: (_, type) {
+              return AdaptiveSheetScaffold(
+                type: type,
+                body: generateListView(
+                  generateSection(
+                    items: const [
+                      ClientEchItem(),
+                      ClientEchForceQueryItem(),
+                      ClientEchQueryServerNameItem(),
+                      ClientEchConfigListItem(),
+                    ],
+                  ),
+                ),
+                title: 'ECH',
+              );
+            },
+          );
+        },
+        info: const Info(
+          label: 'ECH',
+          iconData: CupertinoIcons.lock_shield,
+        ),
+        child: Container(
+          padding: baseInfoEdgeInsets.copyWith(
+            top: 4,
+            bottom: 8,
+            right: 8,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.max,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                flex: 1,
+                child: TooltipText(
+                  text: Text(
+                    appLocalizations.options,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w300,
+                      color: CupertinoDynamicColor.resolve(
+                        CupertinoColors.secondaryLabel,
+                        context,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Consumer(
+                builder: (_, ref, __) {
+                  final clientEch = ref.watch(
+                    networkSettingProvider.select(
+                      (state) => state.clientEch,
+                    ),
+                  );
+                  return CupertinoSwitch(
+                    value: clientEch,
+                    onChanged: (value) {
+                      ref.read(networkSettingProvider.notifier).updateState(
+                            (state) => state.copyWith(
+                              clientEch: value,
+                            ),
+                          );
+                    },
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -363,8 +542,8 @@ class _IPv6ConfigItem extends ConsumerWidget {
             patchClashConfigProvider.select((state) => state.ipv6),
           )
         : ref.watch(
-            patchClashConfigProvider.select((state) => state.ipv6),
-          ) &&
+              patchClashConfigProvider.select((state) => state.ipv6),
+            ) &&
             ref.watch(
               vpnSettingProvider.select((state) => state.ipv6),
             );

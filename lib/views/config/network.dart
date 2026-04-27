@@ -7,7 +7,6 @@ import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -199,6 +198,148 @@ class AutoSetSystemDnsItem extends ConsumerWidget {
   }
 }
 
+class AirportProxyItem extends ConsumerWidget {
+  const AirportProxyItem({super.key});
+
+  @override
+  Widget build(BuildContext context, ref) {
+    final proxyBackendTraffic = ref.watch(
+      networkSettingProvider.select((state) => state.proxyBackendTraffic),
+    );
+    return ListItem.switchItem(
+      title: const Text('机场代理'),
+      subtitle: const Text('控制机场面板、订阅和客服等后端请求是否通过本地代理'),
+      delegate: SwitchDelegate(
+        value: proxyBackendTraffic,
+        onChanged: (bool value) async {
+          ref.read(networkSettingProvider.notifier).updateState(
+                (state) => state.copyWith(
+                  proxyBackendTraffic: value,
+                ),
+              );
+        },
+      ),
+    );
+  }
+}
+
+class ClientEchItem extends ConsumerWidget {
+  const ClientEchItem({super.key});
+
+  @override
+  Widget build(BuildContext context, ref) {
+    final clientEch =
+        ref.watch(networkSettingProvider.select((state) => state.clientEch));
+    return ListItem.switchItem(
+      title: const Text('ECH'),
+      subtitle: const Text(
+        'Use subscription ECH config. DNS ECH falls back to Cloudflare + AliDNS when the node only provides partial ECH fields.',
+      ),
+      delegate: SwitchDelegate(
+        value: clientEch,
+        onChanged: (bool value) async {
+          ref.read(networkSettingProvider.notifier).updateState(
+                (state) => state.copyWith(
+                  clientEch: value,
+                ),
+              );
+        },
+      ),
+    );
+  }
+}
+
+class ClientEchForceQueryItem extends ConsumerWidget {
+  const ClientEchForceQueryItem({super.key});
+
+  @override
+  Widget build(BuildContext context, ref) {
+    final forceQuery = ref.watch(
+      networkSettingProvider.select((state) => state.clientEchForceQuery),
+    );
+    return ListItem<String>.options(
+      title: const Text('ECH Force Query'),
+      subtitle: Text(forceQuery.isEmpty ? 'off' : forceQuery),
+      delegate: OptionsDelegate<String>(
+        title: 'ECH Force Query',
+        options: const ['full', 'off'],
+        textBuilder: (value) => value,
+        value: forceQuery.isEmpty ? 'off' : forceQuery,
+        onChanged: (value) {
+          if (value == null) {
+            return;
+          }
+          ref.read(networkSettingProvider.notifier).updateState(
+                (state) => state.copyWith(
+                  clientEchForceQuery: value == 'off' ? '' : value,
+                ),
+              );
+        },
+      ),
+    );
+  }
+}
+
+class ClientEchQueryServerNameItem extends ConsumerWidget {
+  const ClientEchQueryServerNameItem({super.key});
+
+  @override
+  Widget build(BuildContext context, ref) {
+    final queryServerName = ref.watch(
+      networkSettingProvider.select((state) => state.clientEchQueryServerName),
+    );
+    return ListItem.input(
+      title: const Text('ECH Query Server Name'),
+      subtitle: Text(queryServerName.isEmpty ? 'Not set' : queryServerName),
+      delegate: InputDelegate(
+        title: 'ECH Query Server Name',
+        value: queryServerName,
+        resetValue: defaultClientEchQueryServerName,
+        onChanged: (value) {
+          if (value == null) {
+            return;
+          }
+          ref.read(networkSettingProvider.notifier).updateState(
+                (state) => state.copyWith(
+                  clientEchQueryServerName: value.trim(),
+                ),
+              );
+        },
+      ),
+    );
+  }
+}
+
+class ClientEchConfigListItem extends ConsumerWidget {
+  const ClientEchConfigListItem({super.key});
+
+  @override
+  Widget build(BuildContext context, ref) {
+    final configList = ref.watch(
+      networkSettingProvider.select((state) => state.clientEchConfigList),
+    );
+    return ListItem.input(
+      title: const Text('ECH Config List'),
+      subtitle: Text(configList.isEmpty ? 'Not set' : configList),
+      delegate: InputDelegate(
+        title: 'ECH Config List',
+        value: configList,
+        resetValue: defaultClientEchConfigList,
+        onChanged: (value) {
+          if (value == null) {
+            return;
+          }
+          ref.read(networkSettingProvider.notifier).updateState(
+                (state) => state.copyWith(
+                  clientEchConfigList: value.trim(),
+                ),
+              );
+        },
+      ),
+    );
+  }
+}
+
 class TunStackItem extends ConsumerWidget {
   const TunStackItem({super.key});
 
@@ -294,6 +435,80 @@ class BypassDomainItem extends StatelessWidget {
   }
 }
 
+class CustomDirectDomainsItem extends StatelessWidget {
+  const CustomDirectDomainsItem({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListItem.open(
+      title: const Text('自定义直连域名'),
+      subtitle: const Text('这里添加的域名会自动写入运行配置，并优先按 DIRECT 分流'),
+      delegate: OpenDelegate(
+        blur: false,
+        title: '自定义直连域名',
+        widget: Consumer(
+          builder: (_, ref, __) {
+            final items = ref.watch(
+              networkSettingProvider.select(
+                (state) => state.customDirectDomains,
+              ),
+            );
+            return ListInputPage(
+              title: '自定义直连域名',
+              items: items,
+              titleBuilder: (item) => Text(item),
+              onChange: (values) {
+                ref.read(networkSettingProvider.notifier).updateState(
+                      (state) => state.copyWith(
+                        customDirectDomains: List<String>.from(values),
+                      ),
+                    );
+              },
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class CustomProxyDomainsItem extends StatelessWidget {
+  const CustomProxyDomainsItem({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListItem.open(
+      title: const Text('自定义代理域名'),
+      subtitle: const Text('这里添加的域名会自动写入运行配置，并优先走当前代理分组'),
+      delegate: OpenDelegate(
+        blur: false,
+        title: '自定义代理域名',
+        widget: Consumer(
+          builder: (_, ref, __) {
+            final items = ref.watch(
+              networkSettingProvider.select(
+                (state) => state.customProxyDomains,
+              ),
+            );
+            return ListInputPage(
+              title: '自定义代理域名',
+              items: items,
+              titleBuilder: (item) => Text(item),
+              onChange: (values) {
+                ref.read(networkSettingProvider.notifier).updateState(
+                      (state) => state.copyWith(
+                        customProxyDomains: List<String>.from(values),
+                      ),
+                    );
+              },
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
 class RouteModeItem extends ConsumerWidget {
   const RouteModeItem({super.key});
 
@@ -377,8 +592,11 @@ final networkItems = [
       items: [
         const VpnSystemProxyItem(),
         const BypassDomainItem(),
+        const CustomDirectDomainsItem(),
+        const CustomProxyDomainsItem(),
         const AllowBypassItem(),
         const Ipv6Item(),
+        const AirportProxyItem(),
       ],
     ),
   if (system.isDesktop)
@@ -387,6 +605,9 @@ final networkItems = [
       items: [
         SystemProxyItem(),
         BypassDomainItem(),
+        const CustomDirectDomainsItem(),
+        const CustomProxyDomainsItem(),
+        const AirportProxyItem(),
       ],
     ),
   ...generateSection(
@@ -394,6 +615,10 @@ final networkItems = [
     items: [
       if (system.isDesktop) const TUNItem(),
       if (Platform.isMacOS) const AutoSetSystemDnsItem(),
+      const ClientEchItem(),
+      const ClientEchForceQueryItem(),
+      const ClientEchQueryServerNameItem(),
+      const ClientEchConfigListItem(),
       const TunStackItem(),
       if (!system.isDesktop) ...[
         const RouteModeItem(),

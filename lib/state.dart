@@ -19,12 +19,212 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'common/common.dart';
+import 'common/runtime_dns_config.dart';
 import 'controller.dart';
 import 'models/models.dart';
 import 'package:fl_clash/xboard/config/utils/config_file_loader.dart';
 import 'package:fl_clash/xboard/infrastructure/network/direct_domain_matcher.dart';
 
 typedef UpdateTasks = List<FutureOr Function()>;
+
+Map<String, dynamic>? normalizeRuntimeEchOptions(
+  Map echOpts, {
+  String fallbackConfigList = defaultClientEchConfigList,
+  String fallbackQueryServerName = defaultClientEchQueryServerName,
+  String fallbackForceQuery = defaultClientEchForceQuery,
+}) {
+  final enabledValue = _firstEchValue(echOpts, const ['enable', 'enabled']);
+  if (_isExplicitFalse(enabledValue)) {
+    return null;
+  }
+
+  var config = _echString(_firstEchValue(echOpts, const [
+    'config',
+    'echConfig',
+  ]));
+  var configList = _echString(_firstEchValue(echOpts, const [
+    'config-list',
+    'config_list',
+    'configList',
+    'ech-config-list',
+    'ech_config_list',
+    'echConfigList',
+  ]));
+  var queryServerName = _echString(_firstEchValue(echOpts, const [
+    'query-server-name',
+    'query_server_name',
+    'queryServerName',
+    'ech-query-server-name',
+    'ech_query_server_name',
+    'echQueryServerName',
+  ]));
+  final configuredForceQuery = _normalizeEchForceQuery(
+    _echString(_firstEchValue(
+      echOpts,
+      const [
+        'force-query',
+        'force_query',
+        'forceQuery',
+        'ech-force-query',
+        'ech_force_query',
+        'echForceQuery',
+      ],
+    )),
+  );
+  final forceQuery = configuredForceQuery.isNotEmpty
+      ? configuredForceQuery
+      : _normalizeEchForceQuery(fallbackForceQuery);
+
+  if (_isDisabledEchValue(config) || _isDisabledEchValue(configList)) {
+    return null;
+  }
+
+  final combinedConfig = _splitCombinedEchValue(config);
+  if (combinedConfig != null) {
+    queryServerName =
+        queryServerName.isEmpty ? combinedConfig.$1 : queryServerName;
+    config = '';
+    configList = combinedConfig.$2;
+  }
+  final combinedConfigList = _splitCombinedEchValue(configList);
+  if (combinedConfigList != null) {
+    queryServerName =
+        queryServerName.isEmpty ? combinedConfigList.$1 : queryServerName;
+    configList = combinedConfigList.$2;
+  }
+
+  if (config.startsWith('+') && _looksLikeEchResolver(config.substring(1))) {
+    configList = config.substring(1).trim();
+    config = '';
+  }
+  if (configList.startsWith('+') &&
+      _looksLikeEchResolver(configList.substring(1))) {
+    configList = configList.substring(1).trim();
+  }
+
+  if (_looksLikeEchResolver(config)) {
+    configList = config;
+    config = '';
+  }
+
+  if (configList.isNotEmpty && !_looksLikeEchResolver(configList)) {
+    config = configList;
+    configList = '';
+  }
+
+  if (config.isNotEmpty) {
+    return {
+      'enable': true,
+      'config': config,
+    };
+  }
+
+  if (configList.isNotEmpty) {
+    final resolvedQueryServerName = queryServerName.isNotEmpty
+        ? queryServerName
+        : fallbackQueryServerName.trim();
+    return {
+      'enable': true,
+      'config-list': configList,
+      if (forceQuery.isNotEmpty) 'force-query': forceQuery,
+      if (resolvedQueryServerName.isNotEmpty)
+        'query-server-name': resolvedQueryServerName,
+    };
+  }
+
+  final fallbackResolver = fallbackConfigList.trim();
+  final resolvedQueryServerName = queryServerName.isNotEmpty
+      ? queryServerName
+      : fallbackQueryServerName.trim();
+  if (resolvedQueryServerName.isNotEmpty &&
+      _looksLikeEchResolver(fallbackResolver)) {
+    return {
+      'enable': true,
+      'config-list': fallbackResolver,
+      if (forceQuery.isNotEmpty) 'force-query': forceQuery,
+      'query-server-name': resolvedQueryServerName,
+    };
+  }
+
+  return null;
+}
+
+Object? _firstEchValue(Map source, List<String> keys) {
+  for (final key in keys) {
+    if (source.containsKey(key)) {
+      return source[key];
+    }
+  }
+
+  final normalizedKeys = keys.map(_normalizeEchKey).toSet();
+  for (final entry in source.entries) {
+    if (normalizedKeys.contains(_normalizeEchKey(entry.key.toString()))) {
+      return entry.value;
+    }
+  }
+  return null;
+}
+
+String _normalizeEchKey(String value) {
+  return value.toLowerCase().replaceAll('-', '').replaceAll('_', '');
+}
+
+String _echString(Object? value) {
+  if (value == null) {
+    return '';
+  }
+  if (value is Iterable) {
+    return value.map((item) => item.toString().trim()).join('\n').trim();
+  }
+  return value.toString().trim();
+}
+
+String _normalizeEchForceQuery(String value) {
+  final normalized = value.trim().toLowerCase();
+  return switch (normalized) {
+    'full' || 'half' || 'none' => normalized,
+    _ => '',
+  };
+}
+
+bool _isExplicitFalse(Object? value) {
+  if (value is bool) {
+    return !value;
+  }
+  return _isDisabledEchValue(_echString(value));
+}
+
+bool _isDisabledEchValue(String value) {
+  final normalized = value.trim().toLowerCase();
+  return normalized == 'false' ||
+      normalized == 'none' ||
+      normalized == 'off' ||
+      normalized == '0';
+}
+
+bool _looksLikeEchResolver(String value) {
+  final normalized = value.trim().toLowerCase();
+  return normalized.startsWith('https://') ||
+      normalized.startsWith('tls://') ||
+      normalized.startsWith('quic://') ||
+      normalized.startsWith('dhcp://') ||
+      normalized.startsWith('system://');
+}
+
+(String, String)? _splitCombinedEchValue(String value) {
+  final trimmed = value.trim();
+  final splitIndex = trimmed.indexOf('+');
+  if (splitIndex <= 0 || splitIndex == trimmed.length - 1) {
+    return null;
+  }
+
+  final queryServerName = trimmed.substring(0, splitIndex).trim();
+  final configList = trimmed.substring(splitIndex + 1).trim();
+  if (queryServerName.isEmpty || !_looksLikeEchResolver(configList)) {
+    return null;
+  }
+  return (queryServerName, configList);
+}
 
 class GlobalState {
   static GlobalState? _instance;
@@ -167,6 +367,134 @@ class GlobalState {
       }
     }
     return true;
+  }
+
+  List<String> _normalizeCustomRuleDomains(Iterable<String> domains) {
+    final normalized = DirectDomainMatcher.normalizeDomainList(domains);
+    if (normalized.isNotEmpty) {
+      return normalized;
+    }
+
+    final fallback = <String>{};
+    for (final domain in domains) {
+      final trimmed = domain.trim().toLowerCase();
+      if (trimmed.isNotEmpty) {
+        fallback.add(trimmed);
+      }
+    }
+    return fallback.toList();
+  }
+
+  String? _resolveProxyRuleTarget(
+    Map<String, dynamic> rawConfig,
+    Profile profile,
+  ) {
+    final groups = ((rawConfig["proxy-groups"] ?? const []) as List)
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+    if (groups.isEmpty) {
+      return null;
+    }
+
+    final groupNames = <String>[];
+    String? firstVisibleGroup;
+    for (final group in groups) {
+      final name = (group["name"] ?? "").toString().trim();
+      if (name.isEmpty) {
+        continue;
+      }
+      groupNames.add(name);
+      final isHidden = group["hidden"] == true;
+      if (!isHidden && name != GroupName.GLOBAL.name) {
+        firstVisibleGroup ??= name;
+      }
+    }
+
+    if (config.patchClashConfig.mode == Mode.global &&
+        groupNames.contains(GroupName.GLOBAL.name)) {
+      return GroupName.GLOBAL.name;
+    }
+
+    final currentGroupName = profile.currentGroupName?.trim();
+    if (currentGroupName != null &&
+        currentGroupName.isNotEmpty &&
+        groupNames.contains(currentGroupName) &&
+        currentGroupName != GroupName.GLOBAL.name) {
+      return currentGroupName;
+    }
+
+    for (final groupName in profile.selectedMap.keys) {
+      if (groupName.isNotEmpty &&
+          groupNames.contains(groupName) &&
+          groupName != GroupName.GLOBAL.name) {
+        return groupName;
+      }
+    }
+
+    if (firstVisibleGroup != null) {
+      return firstVisibleGroup;
+    }
+
+    if (groupNames.contains(GroupName.GLOBAL.name)) {
+      return GroupName.GLOBAL.name;
+    }
+
+    return groupNames.first;
+  }
+
+  void _applyClientEchSetting(Map<String, dynamic> rawConfig) {
+    final proxies = rawConfig["proxies"];
+    if (proxies is! List) {
+      return;
+    }
+
+    for (final proxy in proxies.whereType<Map>()) {
+      if (!config.networkProps.clientEch) {
+        proxy.remove("ech-opts");
+        continue;
+      }
+
+      final echOpts = proxy["ech-opts"];
+      if (echOpts is! Map) {
+        continue;
+      }
+
+      final networkProps = config.networkProps;
+      final normalized = normalizeRuntimeEchOptions(
+        echOpts,
+        fallbackConfigList: networkProps.clientEchConfigList,
+        fallbackQueryServerName: networkProps.clientEchQueryServerName,
+        fallbackForceQuery: networkProps.clientEchForceQuery,
+      );
+      if (normalized == null) {
+        proxy.remove("ech-opts");
+        continue;
+      }
+      proxy["ech-opts"] = normalized;
+    }
+  }
+
+  List<String> _insertRulesBeforeMatch(
+    List<String> rules,
+    List<String> customRules,
+  ) {
+    if (customRules.isEmpty) {
+      return rules;
+    }
+
+    final matchIndex = rules.indexWhere(
+      (rule) => rule.trim().toUpperCase().startsWith("MATCH,"),
+    );
+    if (matchIndex == -1) {
+      return [...customRules, ...rules];
+    }
+
+    return [
+      ...rules.sublist(0, matchIndex),
+      ...customRules,
+      ...rules.sublist(matchIndex),
+    ];
   }
 
   String get ua => config.patchClashConfig.globalUa ?? packageInfo.ua;
@@ -474,27 +802,19 @@ class GlobalState {
     for (final host in realPatchConfig.hosts.entries) {
       rawConfig["hosts"][host.key] = host.value.splitByMultipleSeparators;
     }
-    if (rawConfig["dns"] == null) {
-      rawConfig["dns"] = {};
-    }
-    final isEnableDns = rawConfig["dns"]["enable"] == true;
-    final overrideDns = globalState.config.overrideDns;
-    if (overrideDns || !isEnableDns) {
-      final dns = switch (!isEnableDns) {
-        true => realPatchConfig.dns.copyWith(
-            nameserver: [...realPatchConfig.dns.nameserver, "system://"]),
-        false => realPatchConfig.dns,
-      };
-      rawConfig["dns"] = dns.toJson();
-      rawConfig["dns"]["nameserver-policy"] = {};
-      for (final entry in dns.nameserverPolicy.entries) {
-        rawConfig["dns"]["nameserver-policy"][entry.key] =
-            entry.value.splitByMultipleSeparators;
-      }
-    }
-    var rules = [];
-    if (rawConfig["rules"] != null) {
-      rules = rawConfig["rules"];
+    rawConfig["dns"] = buildRuntimeDnsConfig(
+      profileDns: rawConfig["dns"] is Map
+          ? Map<String, dynamic>.from(rawConfig["dns"] as Map)
+          : null,
+      patchDns: realPatchConfig.dns,
+      overrideDns: globalState.config.overrideDns,
+    );
+    _applyClientEchSetting(rawConfig);
+    var rules = <String>[];
+    if (rawConfig["rules"] is List) {
+      rules = List<String>.from(
+        (rawConfig["rules"] as List).whereType<String>(),
+      );
     }
     rawConfig.remove("rules");
 
@@ -531,6 +851,38 @@ class GlobalState {
         rules = [...forceDirectRules, ...rules];
       }
     }
+
+    final customRules = <String>[];
+    final currentRuleSet = <String>{
+      ...rules
+          .map((item) => item.trim().toLowerCase())
+          .where((item) => item.isNotEmpty),
+    };
+
+    for (final host in _normalizeCustomRuleDomains(
+      config.networkProps.customDirectDomains,
+    )) {
+      final rule = "DOMAIN-SUFFIX,$host,DIRECT";
+      final key = rule.toLowerCase();
+      if (currentRuleSet.add(key)) {
+        customRules.add(rule);
+      }
+    }
+
+    final proxyRuleTarget = _resolveProxyRuleTarget(rawConfig, profile);
+    if (proxyRuleTarget != null) {
+      for (final host in _normalizeCustomRuleDomains(
+        config.networkProps.customProxyDomains,
+      )) {
+        final rule = "DOMAIN-SUFFIX,$host,$proxyRuleTarget";
+        final key = rule.toLowerCase();
+        if (currentRuleSet.add(key)) {
+          customRules.add(rule);
+        }
+      }
+    }
+
+    rules = _insertRulesBeforeMatch(rules, customRules);
 
     rawConfig["rule"] = rules;
     return rawConfig;

@@ -5,6 +5,13 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/views/config/general.dart' show showPortConfigDialog;
+import 'package:fl_clash/views/config/network.dart'
+    show
+        ClientEchConfigListItem,
+        ClientEchForceQueryItem,
+        ClientEchItem,
+        ClientEchQueryServerNameItem;
+import 'package:fl_clash/widgets/widgets.dart';
 import 'package:fl_clash/xboard/core/core.dart';
 import 'package:fl_clash/xboard/services/services.dart';
 import 'package:flutter/material.dart';
@@ -76,6 +83,28 @@ class XBoardOutboundMode extends StatelessWidget {
     }
   }
 
+  void _showClientEchConfig(BuildContext context) {
+    showSheet(
+      context: context,
+      builder: (_, type) {
+        return AdaptiveSheetScaffold(
+          type: type,
+          body: generateListView(
+            generateSection(
+              items: const [
+                ClientEchItem(),
+                ClientEchForceQueryItem(),
+                ClientEchQueryServerNameItem(),
+                ClientEchConfigListItem(),
+              ],
+            ),
+          ),
+          title: 'ECH',
+        );
+      },
+    );
+  }
+
   void _selectValidProxyForGlobalMode(WidgetRef ref) {
     final groups = ref.read(groupsProvider);
     if (groups.isEmpty) {
@@ -138,10 +167,14 @@ class XBoardOutboundMode extends StatelessWidget {
         isDark ? Colors.green.shade600 : Colors.green.shade300;
 
     final primaryColor = CupertinoTheme.of(context).primaryColor;
-    final labelColor = CupertinoDynamicColor.resolve(CupertinoColors.label, context);
-    final secondaryLabelColor = CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context);
-    final separatorColor = CupertinoDynamicColor.resolve(CupertinoColors.separator, context);
-    final tertiaryFillColor = CupertinoDynamicColor.resolve(CupertinoColors.tertiarySystemFill, context);
+    final labelColor =
+        CupertinoDynamicColor.resolve(CupertinoColors.label, context);
+    final secondaryLabelColor =
+        CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context);
+    final separatorColor =
+        CupertinoDynamicColor.resolve(CupertinoColors.separator, context);
+    final tertiaryFillColor = CupertinoDynamicColor.resolve(
+        CupertinoColors.tertiarySystemFill, context);
 
     return Consumer(
       builder: (context, ref, child) {
@@ -155,14 +188,17 @@ class XBoardOutboundMode extends StatelessWidget {
                 patchClashConfigProvider.select((state) => state.ipv6),
               )
             : ref.watch(
-                patchClashConfigProvider.select((state) => state.ipv6),
-              ) &&
+                  patchClashConfigProvider.select((state) => state.ipv6),
+                ) &&
                 ref.watch(vpnSettingProvider.select((state) => state.ipv6));
+        final clientEchEnabled = ref.watch(
+          networkSettingProvider.select((state) => state.clientEch),
+        );
 
         return Container(
           decoration: BoxDecoration(
             color: CupertinoDynamicColor.resolve(
-                CupertinoColors.tertiarySystemGroupedBackground, context)
+                    CupertinoColors.tertiarySystemGroupedBackground, context)
                 .withValues(alpha: 0.5),
             borderRadius: BorderRadius.circular(12),
           ),
@@ -239,13 +275,61 @@ class XBoardOutboundMode extends StatelessWidget {
                           ),
                         ),
                       ),
+                      GestureDetector(
+                        onTap: () {
+                          _showClientEchConfig(context);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: clientEchEnabled
+                                ? primaryColor.withValues(alpha: 0.15)
+                                : tertiaryFillColor,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: clientEchEnabled
+                                  ? primaryColor.withValues(alpha: 0.5)
+                                  : separatorColor.withValues(alpha: 0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'ECH',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: clientEchEnabled
+                                      ? primaryColor
+                                      : secondaryLabelColor,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                clientEchEnabled
+                                    ? CupertinoIcons.check_mark_circled_solid
+                                    : CupertinoIcons.circle,
+                                size: 14,
+                                color: clientEchEnabled
+                                    ? primaryColor
+                                    : secondaryLabelColor,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                       CupertinoButton(
                         onPressed: showPortConfigDialog,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
                           vertical: 4,
                         ),
-                        minSize: 0,
+                        minimumSize: Size.zero,
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -350,9 +434,12 @@ class XBoardOutboundMode extends StatelessWidget {
     required Color borderColor,
     required ValueChanged<bool> onSelected,
   }) {
-    final labelColor = CupertinoDynamicColor.resolve(CupertinoColors.label, context);
-    final separatorColor = CupertinoDynamicColor.resolve(CupertinoColors.separator, context);
-    final tertiaryFillColor = CupertinoDynamicColor.resolve(CupertinoColors.tertiarySystemFill, context);
+    final labelColor =
+        CupertinoDynamicColor.resolve(CupertinoColors.label, context);
+    final separatorColor =
+        CupertinoDynamicColor.resolve(CupertinoColors.separator, context);
+    final tertiaryFillColor = CupertinoDynamicColor.resolve(
+        CupertinoColors.tertiarySystemFill, context);
 
     return GestureDetector(
       onTap: () => onSelected(!selected),
@@ -401,9 +488,8 @@ class XBoardOutboundMode extends StatelessWidget {
     bool tunEnabled,
     BuildContext context,
   ) {
-    final tunStatus = tunEnabled
-        ? ' | ${AppLocalizations.of(context).xboardTunEnabled}'
-        : '';
+    final tunStatus =
+        tunEnabled ? ' | ${AppLocalizations.of(context).xboardTunEnabled}' : '';
     switch (mode) {
       case Mode.rule:
         return '${AppLocalizations.of(context).xboardProxyModeRuleDescription}$tunStatus';
