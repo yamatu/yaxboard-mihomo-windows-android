@@ -58,6 +58,136 @@ func TestConvertsV2Ray_vlessXHTTP(t *testing.T) {
 	}
 }
 
+func TestConvertsV2Ray_vlessXHTTPKeepsPanelEncryptionValue(t *testing.T) {
+	link := "vless://11111111-1111-1111-1111-111111111111@example.com:443?security=tls&type=xhttp&host=example.com&path=%2Ftest&mode=stream-one&encryption=mlkem768x25519plus.native.600s.rYcGzwIyX6qtzNjOEhFNjayoiFMyjkc6NgOYy002oEk#xhttp-encryption"
+
+	proxies, err := ConvertsV2Ray([]byte(link))
+
+	assert.NoError(t, err)
+	if assert.Len(t, proxies, 1) {
+		proxy := proxies[0]
+		assert.Equal(t, "mlkem768x25519plus.native.600s.rYcGzwIyX6qtzNjOEhFNjayoiFMyjkc6NgOYy002oEk", proxy["encryption"])
+		assert.Equal(t, "xhttp", proxy["network"])
+
+		xhttpOpts, ok := proxy["xhttp-opts"].(map[string]any)
+		if assert.True(t, ok) {
+			assert.Equal(t, "stream-one", xhttpOpts["mode"])
+			assert.Equal(t, "/test", xhttpOpts["path"])
+		}
+	}
+}
+
+func TestConvertsV2Ray_vlessKeepsPanelEncryptionAndVisionFlow(t *testing.T) {
+	link := "vless://11111111-1111-1111-1111-111111111111@example.com:443?security=tls&encryption=mlkem768x25519plus.native.600s.rYcGzwIyX6qtzNjOEhFNjayoiFMyjkc6NgOYy002oEk&flow=xtls-rprx-vision#vision-encryption"
+
+	proxies, err := ConvertsV2Ray([]byte(link))
+
+	assert.NoError(t, err)
+	if assert.Len(t, proxies, 1) {
+		proxy := proxies[0]
+		assert.Equal(t, "mlkem768x25519plus.native.600s.rYcGzwIyX6qtzNjOEhFNjayoiFMyjkc6NgOYy002oEk", proxy["encryption"])
+		assert.Equal(t, "xtls-rprx-vision", proxy["flow"])
+	}
+}
+
+func TestConvertsV2Ray_vlessECHQuery(t *testing.T) {
+	echConfig := "AAECAw=="
+	link := "vless://11111111-1111-1111-1111-111111111111@example.com:443?security=tls&ech=" + echConfig + "#ech-query"
+
+	proxies, err := ConvertsV2Ray([]byte(link))
+
+	assert.NoError(t, err)
+	if assert.Len(t, proxies, 1) {
+		echOpts, ok := proxies[0]["ech-opts"].(map[string]any)
+		if assert.True(t, ok) {
+			assert.Equal(t, true, echOpts["enable"])
+			assert.Equal(t, echConfig, echOpts["config"])
+		}
+	}
+}
+
+func TestConvertsV2Ray_vlessECHConfigListQuery(t *testing.T) {
+	echConfig := "AAECAw=="
+	link := "vless://11111111-1111-1111-1111-111111111111@example.com:443?security=tls&echConfigList=" + echConfig + "#ech-config-list"
+
+	proxies, err := ConvertsV2Ray([]byte(link))
+
+	assert.NoError(t, err)
+	if assert.Len(t, proxies, 1) {
+		echOpts, ok := proxies[0]["ech-opts"].(map[string]any)
+		if assert.True(t, ok) {
+			assert.Equal(t, true, echOpts["enable"])
+			assert.Equal(t, echConfig, echOpts["config"])
+		}
+	}
+}
+
+func TestConvertsV2Ray_vlessECHQueryOptions(t *testing.T) {
+	link := "vless://11111111-1111-1111-1111-111111111111@example.com:443?security=tls&ech=cloudflare-ech.com%2Bhttps%3A%2F%2Fdns.alidns.com%2Fdns-query&echConfigList=https%3A%2F%2Fdns.alidns.com%2Fdns-query&echForceQuery=full#ech-query-options"
+
+	proxies, err := ConvertsV2Ray([]byte(link))
+
+	assert.NoError(t, err)
+	if assert.Len(t, proxies, 1) {
+		echOpts, ok := proxies[0]["ech-opts"].(map[string]any)
+		if assert.True(t, ok) {
+			assert.Equal(t, true, echOpts["enable"])
+			assert.Equal(t, "https://dns.alidns.com/dns-query", echOpts["config-list"])
+			assert.Equal(t, "full", echOpts["force-query"])
+			assert.Equal(t, "cloudflare-ech.com", echOpts["query-server-name"])
+		}
+	}
+}
+
+func TestConvertsV2Ray_vlessECHFromXrayExtraTLSSettings(t *testing.T) {
+	link := "vless://11111111-1111-1111-1111-111111111111@example.com:443?security=tls&extra={\"extra\":{\"downloadSettings\":{\"network\":\"xhttp\",\"security\":\"tls\",\"tlsSettings\":{\"serverName\":\"example.com\",\"echConfigList\":[\"AAECAw==\"]}}}}#ech-extra"
+
+	proxies, err := ConvertsV2Ray([]byte(link))
+
+	assert.NoError(t, err)
+	if assert.Len(t, proxies, 1) {
+		echOpts, ok := proxies[0]["ech-opts"].(map[string]any)
+		if assert.True(t, ok) {
+			assert.Equal(t, true, echOpts["enable"])
+			assert.Equal(t, "AAECAw==", echOpts["config"])
+		}
+	}
+}
+
+func TestConvertsV2Ray_vlessECHFromNestedXboardSettings(t *testing.T) {
+	link := "vless://11111111-1111-1111-1111-111111111111@example.com:443?security=tls&extra={\"extra\":{\"downloadSettings\":{\"network\":\"xhttp\",\"security\":\"tls\",\"tlsSettings\":{\"serverName\":\"example.com\",\"ech\":{\"enabled\":true,\"config_list\":\"https://dns.alidns.com/dns-query\",\"force_query\":\"full\",\"query_server_name\":\"cloudflare-ech.com\"}}}}}#ech-nested"
+
+	proxies, err := ConvertsV2Ray([]byte(link))
+
+	assert.NoError(t, err)
+	if assert.Len(t, proxies, 1) {
+		echOpts, ok := proxies[0]["ech-opts"].(map[string]any)
+		if assert.True(t, ok) {
+			assert.Equal(t, true, echOpts["enable"])
+			assert.Equal(t, "https://dns.alidns.com/dns-query", echOpts["config-list"])
+			assert.Equal(t, "full", echOpts["force-query"])
+			assert.Equal(t, "cloudflare-ech.com", echOpts["query-server-name"])
+		}
+	}
+}
+
+func TestConvertsV2Ray_vlessECHFromCombinedXrayTLSSettings(t *testing.T) {
+	link := "vless://11111111-1111-1111-1111-111111111111@example.com:443?security=tls&extra={\"extra\":{\"downloadSettings\":{\"network\":\"xhttp\",\"security\":\"tls\",\"tlsSettings\":{\"serverName\":\"example.com\",\"echConfigList\":[\"cloudflare-ech.com+https://dns.alidns.com/dns-query\"],\"echForceQuery\":\"full\"}}}}#ech-combined"
+
+	proxies, err := ConvertsV2Ray([]byte(link))
+
+	assert.NoError(t, err)
+	if assert.Len(t, proxies, 1) {
+		echOpts, ok := proxies[0]["ech-opts"].(map[string]any)
+		if assert.True(t, ok) {
+			assert.Equal(t, true, echOpts["enable"])
+			assert.Equal(t, "https://dns.alidns.com/dns-query", echOpts["config-list"])
+			assert.Equal(t, "full", echOpts["force-query"])
+			assert.Equal(t, "cloudflare-ech.com", echOpts["query-server-name"])
+		}
+	}
+}
+
 func TestConvertsV2Ray_vlessSplitHTTP(t *testing.T) {
 	link := "vless://33333333-3333-3333-3333-333333333333@example.com:443?security=tls&type=splithttp&host=example.com&path=%2Fsplit#split-http-test"
 

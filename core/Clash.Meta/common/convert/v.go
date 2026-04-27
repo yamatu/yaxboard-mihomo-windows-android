@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,6 +21,10 @@ type vShareExtra struct {
 	serverName       string
 	alpn             []string
 	allowInsecure    *bool
+	echEnabled       bool
+	echConfig        string
+	echForceQuery    string
+	echQueryServer   string
 	realityPublicKey string
 	realityShortID   string
 	fingerprint      string
@@ -73,6 +78,10 @@ func handleVShareLink(names map[string]int, url *url.URL, scheme string, proxy m
 		} else if extra.allowInsecure != nil {
 			proxy["skip-cert-verify"] = *extra.allowInsecure
 		}
+	}
+
+	if strings.HasSuffix(security, "tls") {
+		applyVShareECHOptions(proxy, query, extra)
 	}
 
 	if sni := firstNonEmpty(query.Get("sni"), extra.serverName); sni != "" {
@@ -246,6 +255,63 @@ func handleVShareLink(names map[string]int, url *url.URL, scheme string, proxy m
 	return nil
 }
 
+func applyVShareECHOptions(proxy map[string]any, query url.Values, extra vShareExtra) {
+	echQueryValue := query.Get("ech")
+	echQueryServerFromCombined, echConfigFromCombined := splitV2rayNECHValue(echQueryValue)
+	echValue := firstNonEmpty(
+		query.Get("echConfigList"),
+		query.Get("ech_config_list"),
+		query.Get("ech-config-list"),
+		echConfigFromCombined,
+		echQueryValue,
+		extra.echConfig,
+	)
+	echForceQuery := firstNonEmpty(
+		query.Get("echForceQuery"),
+		query.Get("ech_force_query"),
+		query.Get("ech-force-query"),
+		extra.echForceQuery,
+	)
+	echQueryServer := firstNonEmpty(
+		query.Get("echQueryServerName"),
+		query.Get("ech_query_server_name"),
+		query.Get("ech-query-server-name"),
+		echQueryServerFromCombined,
+		extra.echQueryServer,
+	)
+	echEnabled := query.Has("ech") ||
+		query.Has("echConfigList") ||
+		query.Has("ech_config_list") ||
+		query.Has("ech-config-list") ||
+		query.Has("echForceQuery") ||
+		query.Has("ech_force_query") ||
+		query.Has("ech-force-query") ||
+		query.Has("echQueryServerName") ||
+		query.Has("ech_query_server_name") ||
+		query.Has("ech-query-server-name") ||
+		extra.echEnabled
+	if !echEnabled {
+		return
+	}
+	if isECHDisabledValue(echValue) {
+		return
+	}
+
+	echOpts := map[string]any{"enable": true}
+	if config, ok := normalizeECHConfigForMihomo(echValue); ok {
+		echOpts["config"] = config
+	} else if looksLikeECHNameserver(echValue) {
+		echOpts["config-list"] = echValue
+	}
+	if echForceQuery != "" {
+		echOpts["force-query"] = echForceQuery
+	}
+	if echQueryServer != "" {
+		echOpts["query-server-name"] = echQueryServer
+	}
+	proxy["ech-opts"] = echOpts
+}
+
 func parseVShareURL(raw string) (*url.URL, error) {
 	u, err := url.Parse(raw)
 	if err == nil {
@@ -410,6 +476,7 @@ func parseVShareExtra(raw string) vShareExtra {
 			result.allowInsecure = &insecure
 		}
 		result.fingerprint = valueToString(tlsSettings["fingerprint"])
+		parseXrayECHSettings(tlsSettings, &result)
 	}
 
 	xhttpSettings := valueToMap(downloadSettings["xhttpSettings"])
@@ -452,6 +519,179 @@ func parseVShareExtra(raw string) vShareExtra {
 	}
 
 	return result
+}
+
+func parseXrayECHConfigList(value any) (bool, string) {
+	for _, item := range valueToStringSlice(value) {
+		_, configFromCombined := splitV2rayNECHValue(item)
+		if configFromCombined != "" {
+			item = configFromCombined
+		}
+		if config, ok := normalizeECHConfigForMihomo(item); ok {
+			return true, config
+		}
+		if looksLikeECHNameserver(item) {
+			return true, strings.TrimSpace(item)
+		}
+	}
+
+	return len(valueToStringSlice(value)) > 0, ""
+}
+
+func parseXrayECHQueryServerName(value any) string {
+	for _, item := range valueToStringSlice(value) {
+		queryServerName, _ := splitV2rayNECHValue(item)
+		if queryServerName != "" {
+			return queryServerName
+		}
+	}
+	return ""
+}
+
+func splitV2rayNECHValue(value string) (string, string) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", ""
+	}
+	if !strings.Contains(value, "+") {
+		fields := strings.Fields(value)
+		if len(fields) == 2 && strings.TrimSpace(fields[0]) != "" && looksLikeECHNameserver(fields[1]) {
+			return strings.TrimSpace(fields[0]), strings.TrimSpace(fields[1])
+		}
+		return "", ""
+	}
+
+	parts := strings.SplitN(value, "+", 2)
+	if len(parts) != 2 {
+		return "", ""
+	}
+
+	queryServerName := strings.TrimSpace(parts[0])
+	configList := strings.TrimSpace(parts[1])
+	if queryServerName == "" || !looksLikeECHNameserver(configList) {
+		return "", ""
+	}
+	return queryServerName, configList
+}
+
+func parseXrayECHSettings(tlsSettings map[string]any, result *vShareExtra) {
+	if tlsSettings == nil || result == nil {
+		return
+	}
+
+	echEnabled, echConfig := parseXrayECHConfigList(firstNonNil(
+		tlsSettings["echConfigList"],
+		tlsSettings["ech_config_list"],
+		tlsSettings["ech-config-list"],
+	))
+	result.echEnabled = echEnabled
+	result.echConfig = echConfig
+	result.echForceQuery = firstNonEmpty(
+		valueToString(tlsSettings["echForceQuery"]),
+		valueToString(tlsSettings["ech_force_query"]),
+		valueToString(tlsSettings["ech-force-query"]),
+	)
+	result.echQueryServer = firstNonEmpty(
+		valueToString(tlsSettings["echQueryServerName"]),
+		valueToString(tlsSettings["ech_query_server_name"]),
+		valueToString(tlsSettings["ech-query-server-name"]),
+		valueToString(tlsSettings["queryServerName"]),
+		valueToString(tlsSettings["query_server_name"]),
+		valueToString(tlsSettings["query-server-name"]),
+		parseXrayECHQueryServerName(firstNonNil(
+			tlsSettings["echConfigList"],
+			tlsSettings["ech_config_list"],
+			tlsSettings["ech-config-list"],
+		)),
+	)
+
+	echSettings := valueToMap(tlsSettings["ech"])
+	if echSettings == nil {
+		return
+	}
+	if enabled, ok := valueToBool(echSettings["enabled"]); ok {
+		result.echEnabled = enabled
+	}
+	nestedEnabled, nestedConfig := parseXrayECHConfigList(firstNonNil(
+		echSettings["config"],
+		echSettings["configList"],
+		echSettings["config_list"],
+		echSettings["config-list"],
+		echSettings["echConfigList"],
+		echSettings["ech_config_list"],
+		echSettings["ech-config-list"],
+	))
+	if nestedEnabled {
+		result.echEnabled = true
+		result.echConfig = nestedConfig
+	}
+	result.echForceQuery = firstNonEmpty(
+		valueToString(echSettings["forceQuery"]),
+		valueToString(echSettings["force_query"]),
+		valueToString(echSettings["force-query"]),
+		result.echForceQuery,
+	)
+	result.echQueryServer = firstNonEmpty(
+		valueToString(echSettings["queryServerName"]),
+		valueToString(echSettings["query_server_name"]),
+		valueToString(echSettings["query-server-name"]),
+		parseXrayECHQueryServerName(firstNonNil(
+			echSettings["config"],
+			echSettings["configList"],
+			echSettings["config_list"],
+			echSettings["config-list"],
+			echSettings["echConfigList"],
+			echSettings["ech_config_list"],
+			echSettings["ech-config-list"],
+		)),
+		result.echQueryServer,
+	)
+}
+
+func normalizeECHConfigForMihomo(value string) (string, bool) {
+	value = strings.ReplaceAll(strings.TrimSpace(value), " ", "+")
+	if value == "" || isECHDisabledValue(value) {
+		return "", false
+	}
+
+	decoders := []*base64.Encoding{
+		base64.StdEncoding,
+		base64.RawStdEncoding,
+		base64.URLEncoding,
+		base64.RawURLEncoding,
+	}
+	for _, decoder := range decoders {
+		if decoded, err := decoder.DecodeString(value); err == nil && len(decoded) > 0 {
+			return base64.StdEncoding.EncodeToString(decoded), true
+		}
+	}
+
+	return "", false
+}
+
+func isECHDisabledValue(value string) bool {
+	value = strings.TrimSpace(value)
+	return strings.EqualFold(value, "false") ||
+		strings.EqualFold(value, "none") ||
+		value == "0"
+}
+
+func looksLikeECHNameserver(value string) bool {
+	value = strings.TrimSpace(value)
+	return strings.HasPrefix(value, "https://") ||
+		strings.HasPrefix(value, "tls://") ||
+		strings.HasPrefix(value, "quic://") ||
+		strings.HasPrefix(value, "dhcp://") ||
+		strings.HasPrefix(value, "system://")
+}
+
+func firstNonNil(values ...any) any {
+	for _, value := range values {
+		if value != nil {
+			return value
+		}
+	}
+	return nil
 }
 
 func parseVShareExtraAny(v any) vShareExtra {
