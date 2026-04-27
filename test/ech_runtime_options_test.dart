@@ -1,6 +1,9 @@
 import 'package:fl_clash/state.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+const cloudflareEchConfigFallback =
+    'AEX+DQBBegAgACBXo6Bpkru5yBNyUT9IPlrl5cbgJa7ZHyPlClHQ0l6tZgAEAAEAAQASY2xvdWRmbGFyZS1lY2guY29tAAA=';
+
 void main() {
   test('normalizeRuntimeEchOptions keeps static subscription config only', () {
     final normalized = normalizeRuntimeEchOptions({
@@ -25,9 +28,7 @@ void main() {
 
     expect(normalized, {
       'enable': true,
-      'config-list': 'https://dns.alidns.com/dns-query',
-      'force-query': 'full',
-      'query-server-name': 'cloudflare-ech.com',
+      'config': cloudflareEchConfigFallback,
     });
   });
 
@@ -53,9 +54,7 @@ void main() {
 
     expect(normalized, {
       'enable': true,
-      'config-list': 'https://dns.alidns.com/dns-query',
-      'force-query': 'full',
-      'query-server-name': 'cloudflare-ech.com',
+      'config': cloudflareEchConfigFallback,
     });
   });
 
@@ -71,9 +70,25 @@ void main() {
 
     expect(normalized, {
       'enable': true,
+      'config': cloudflareEchConfigFallback,
+    });
+  });
+
+  test('normalizeRuntimeEchOptions keeps dynamic DNS for custom ECH names', () {
+    final normalized = normalizeRuntimeEchOptions(
+      {
+        'enable': true,
+        'config-list': 'https://example.test/dns-query',
+      },
+      fallbackQueryServerName: 'ech.example.test',
+      fallbackForceQuery: 'full',
+    );
+
+    expect(normalized, {
+      'enable': true,
       'config-list': 'https://example.test/dns-query',
       'force-query': 'full',
-      'query-server-name': 'cloudflare-ech.com',
+      'query-server-name': 'ech.example.test',
     });
   });
 }

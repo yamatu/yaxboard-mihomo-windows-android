@@ -27,6 +27,9 @@ import 'package:fl_clash/xboard/infrastructure/network/direct_domain_matcher.dar
 
 typedef UpdateTasks = List<FutureOr Function()>;
 
+const _cloudflareEchConfigFallback =
+    'AEX+DQBBegAgACBXo6Bpkru5yBNyUT9IPlrl5cbgJa7ZHyPlClHQ0l6tZgAEAAEAAQASY2xvdWRmbGFyZS1lY2guY29tAAA=';
+
 Map<String, dynamic>? normalizeRuntimeEchOptions(
   Map echOpts, {
   String fallbackConfigList = defaultClientEchConfigList,
@@ -123,6 +126,14 @@ Map<String, dynamic>? normalizeRuntimeEchOptions(
     final resolvedQueryServerName = queryServerName.isNotEmpty
         ? queryServerName
         : fallbackQueryServerName.trim();
+    final staticConfig =
+        _knownStaticEchConfig(resolvedQueryServerName, configList);
+    if (staticConfig.isNotEmpty) {
+      return {
+        'enable': true,
+        'config': staticConfig,
+      };
+    }
     return {
       'enable': true,
       'config-list': configList,
@@ -138,6 +149,14 @@ Map<String, dynamic>? normalizeRuntimeEchOptions(
       : fallbackQueryServerName.trim();
   if (resolvedQueryServerName.isNotEmpty &&
       _looksLikeEchResolver(fallbackResolver)) {
+    final staticConfig =
+        _knownStaticEchConfig(resolvedQueryServerName, fallbackResolver);
+    if (staticConfig.isNotEmpty) {
+      return {
+        'enable': true,
+        'config': staticConfig,
+      };
+    }
     return {
       'enable': true,
       'config-list': fallbackResolver,
@@ -147,6 +166,20 @@ Map<String, dynamic>? normalizeRuntimeEchOptions(
   }
 
   return null;
+}
+
+String _knownStaticEchConfig(String queryServerName, String configList) {
+  final normalizedName = queryServerName.trim().toLowerCase();
+  if (normalizedName != defaultClientEchQueryServerName) {
+    return '';
+  }
+
+  final normalizedConfigList = configList.trim().toLowerCase();
+  if (!_looksLikeEchResolver(normalizedConfigList)) {
+    return '';
+  }
+
+  return _cloudflareEchConfigFallback;
 }
 
 Object? _firstEchValue(Map source, List<String> keys) {
@@ -472,6 +505,14 @@ class GlobalState {
         continue;
       }
       proxy["ech-opts"] = normalized;
+      _applyEchCompatibleFingerprint(proxy);
+    }
+  }
+
+  void _applyEchCompatibleFingerprint(Map proxy) {
+    final current = (proxy["client-fingerprint"] ?? "").toString().trim();
+    if (current.isEmpty || current.toLowerCase() == "edge") {
+      proxy["client-fingerprint"] = "chrome";
     }
   }
 
